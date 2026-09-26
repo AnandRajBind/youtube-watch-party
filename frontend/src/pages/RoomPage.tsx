@@ -1,26 +1,15 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   FiArrowLeft,
   FiAlertTriangle,
   FiLogIn,
   FiLoader,
   FiAlertCircle,
+  FiRefreshCw,
 } from 'react-icons/fi';
 import { roomApiService, AppApiError } from '../services/api';
-import { socketService } from '../socket/socket';
 import type { SafeRoomDto, Role } from '../types/room.types';
-import type {
-  SyncStatePayload,
-  PlaybackBroadcastPayload,
-  SeekBroadcastPayload,
-  ChangeVideoBroadcastPayload,
-  ParticipantUpdatePayload,
-  RoleAssignedBroadcastPayload,
-  ParticipantRemovedBroadcastPayload,
-  SocketErrorPayload,
-} from '../types/socket.types';
-import { SOCKET_EVENTS } from '../types/socket.types';
 import { validateUsername } from '../utils/roomCode';
 
 import { RoomHeader } from '../components/room/RoomHeader';
@@ -28,23 +17,19 @@ import { YouTubePlayer, type YouTubePlayerHandle } from '../components/room/YouT
 import { PlaybackControls } from '../components/room/PlaybackControls';
 import { VideoUrlInput } from '../components/room/VideoUrlInput';
 import { ParticipantsPanel } from '../components/room/ParticipantsPanel';
+import { useWatchPartySocket } from '../hooks/useWatchPartySocket';
 
 export const RoomPage: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
+  const navigate = useNavigate();
 
-  // Imperative handle to control the YouTube player cleanly without feedback loops
+  // Imperative handle to control the YouTube player
   const playerRef = useRef<YouTubePlayerHandle>(null);
 
-  // Room & State
-  const [room, setRoom] = useState<SafeRoomDto | null>(null);
+  // Initial REST loading & session state
+  const [initialRoom, setInitialRoom] = useState<SafeRoomDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [socketError, setSocketError] = useState<string | null>(null);
-  const [socketConnected, setSocketConnected] = useState(false);
-
-  // Playhead & Duration
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
 
   // Current User Session
   const [currentUsername, setCurrentUsername] = useState(
@@ -64,158 +49,41 @@ export const RoomPage: React.FC = () => {
   const [isDirectJoining, setIsDirectJoining] = useState(false);
   const [directJoinError, setDirectJoinError] = useState<string | null>(null);
 
+  // Kicked Notification Modal
+  const [removedNotice, setRemovedNotice] = useState<string | null>(null);
+
+  const handleRoleUpdate = useCallback((newRole: Role) => {
+    setCurrentRole(newRole);
+    sessionStorage.setItem('watchparty_role', newRole);
+  }, []);
+
+  const handleRemovedByHost = useCallback((reason?: string) => {
+    setRemovedNotice(reason || 'You have been removed from this room by the Host.');
+  }, []);
+
+  // Real-Time Socket.IO Synchronization Hook
+  const {
+    room,
+    currentTime,
+    duration,
+    socketConnected,
+    isReconnecting,
+    socketError,
+    actions,
+  } = useWatchPartySocket({
+    roomCode: roomCode || '',
+    username: currentUsername,
+    userId: currentUserId,
+    initialRoom,
+    playerRef,
+    currentRole,
+    onRoleUpdate: handleRoleUpdate,
+    onRemovedByHost: handleRemovedByHost,
+  });
+
   const isHostOrMod = currentRole === 'host' || currentRole === 'moderator';
 
-  // Socket setup
-  const initSocketListeners = useCallback(
-    (code: string, username: string, userId?: string) => {
-      const socket = socketService.connect();
-
-      const handleConnect = () => {
-        setSocketConnected(true);
-        socketService.joinRoom({
-          roomCode: code,
-          username,
-          userId,
-        });
-      };
-
-      const handleDisconnect = () => {
-        setSocketConnected(false);
-      };
-
-      // 1. Authoritative Remote State Snapshot
-      const handleSyncState = (data: SyncStatePayload) => {
-        setRoom((prev) =>
-          prev
-            ? {
-                ...prev,
-                playbackState: data.playState,
-                playbackTime: data.currentTime,
-                currentVideoId: data.videoId,
-                participants: data.participants,
-                participantCount: data.participants.length,
-              }
-            : prev
-        );
-        setCurrentTime(data.currentTime);
-        if (data.userRole) {
-          setCurrentRole(data.userRole);
-          sessionStorage.setItem('watchparty_role', data.userRole);
-        }
-
-        // Apply authoritative state to YouTube player without emitting back
-        playerRef.current?.applyRemoteChangeVideo(data.videoId, data.currentTime, data.playState);
-      };
-
-      // 2. Authoritative Remote Play
-      const handlePlay = (data: PlaybackBroadcastPayload) => {
-        setRoom((prev) => (prev ? { ...prev, playbackState: 'playing', playbackTime: data.currentTime } : prev));
-        setCurrentTime(data.currentTime);
-        playerRef.current?.applyRemotePlay(data.currentTime);
-      };
-
-      // 3. Authoritative Remote Pause
-      const handlePause = (data: PlaybackBroadcastPayload) => {
-        setRoom((prev) => (prev ? { ...prev, playbackState: 'paused', playbackTime: data.currentTime } : prev));
-        setCurrentTime(data.currentTime);
-        playerRef.current?.applyRemotePause(data.currentTime);
-      };
-
-      // 4. Authoritative Remote Seek
-      const handleSeek = (data: SeekBroadcastPayload) => {
-        setRoom((prev) => (prev ? { ...prev, playbackTime: data.currentTime } : prev));
-        setCurrentTime(data.currentTime);
-        playerRef.current?.applyRemoteSeek(data.currentTime);
-      };
-
-      // 5. Authoritative Remote Change Video
-      const handleChangeVideo = (data: ChangeVideoBroadcastPayload) => {
-        setRoom((prev) =>
-          prev
-            ? {
-                ...prev,
-                currentVideoId: data.videoId,
-                playbackState: data.playState,
-                playbackTime: data.currentTime,
-              }
-            : prev
-        );
-        setCurrentTime(data.currentTime);
-        playerRef.current?.applyRemoteChangeVideo(data.videoId, data.currentTime, data.playState);
-      };
-
-      // 6. Real-Time Participant Presence Updates
-      const handleParticipantUpdate = (data: ParticipantUpdatePayload) => {
-        setRoom((prev) =>
-          prev
-            ? {
-                ...prev,
-                participants: data.participants,
-                participantCount: data.participantCount,
-              }
-            : prev
-        );
-      };
-
-      // 7. Role Assigned
-      const handleRoleAssigned = (data: RoleAssignedBroadcastPayload) => {
-        const myId = sessionStorage.getItem('watchparty_userId');
-        if (data.targetUserId === myId || data.userId === myId) {
-          const newRole = data.newRole || data.role;
-          setCurrentRole(newRole);
-          sessionStorage.setItem('watchparty_role', newRole);
-        }
-      };
-
-      // 8. Participant Removed
-      const handleParticipantRemoved = (data: ParticipantRemovedBroadcastPayload) => {
-        const myId = sessionStorage.getItem('watchparty_userId');
-        if (data.targetUserId === myId) {
-          setError(data.reason || 'You were removed from this room by the Host.');
-          socketService.disconnect();
-        }
-      };
-
-      // 9. Error from Server
-      const handleSocketError = (data: SocketErrorPayload) => {
-        setSocketError(data.message || 'An error occurred during real-time sync.');
-        setTimeout(() => setSocketError(null), 5000);
-      };
-
-      socket.on('connect', handleConnect);
-      socket.on('disconnect', handleDisconnect);
-
-      const unsubs = [
-        socketService.on(SOCKET_EVENTS.SYNC_STATE, handleSyncState),
-        socketService.on(SOCKET_EVENTS.PLAY, handlePlay),
-        socketService.on(SOCKET_EVENTS.PAUSE, handlePause),
-        socketService.on(SOCKET_EVENTS.SEEK, handleSeek),
-        socketService.on(SOCKET_EVENTS.CHANGE_VIDEO, handleChangeVideo),
-        socketService.on(SOCKET_EVENTS.PARTICIPANT_UPDATE, handleParticipantUpdate),
-        socketService.on(SOCKET_EVENTS.ROLE_ASSIGNED, handleRoleAssigned),
-        socketService.on(SOCKET_EVENTS.PARTICIPANT_REMOVED, handleParticipantRemoved),
-        socketService.on(SOCKET_EVENTS.ERROR, handleSocketError),
-      ];
-
-      if (socket.connected) {
-        handleConnect();
-      }
-
-      return () => {
-        socket.off('connect', handleConnect);
-        socket.off('disconnect', handleDisconnect);
-        unsubs.forEach((unsub) => unsub());
-        socketService.leaveRoom({ roomCode: code });
-        socketService.disconnect();
-      };
-    },
-    []
-  );
-
-  const cleanupSocketRef = useRef<(() => void) | null>(null);
-
-  // Initial Room Loading
+  // Fetch initial room via REST API
   useEffect(() => {
     if (!roomCode) {
       setError('Invalid room code provided in URL');
@@ -225,18 +93,15 @@ export const RoomPage: React.FC = () => {
 
     let isMounted = true;
 
-    const checkAndInitRoom = async () => {
+    const fetchRoom = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Fetch room to verify existence
         const safeRoom = await roomApiService.getRoom(roomCode);
         if (!isMounted) return;
-        setRoom(safeRoom);
-        setCurrentTime(safeRoom.playbackTime);
+        setInitialRoom(safeRoom);
 
-        // Check if user has an existing session in sessionStorage
         const savedUsername = sessionStorage.getItem('watchparty_username');
         const savedUserId = sessionStorage.getItem('watchparty_userId');
 
@@ -255,9 +120,6 @@ export const RoomPage: React.FC = () => {
           setCurrentRole(myParticipant.role);
           sessionStorage.setItem('watchparty_role', myParticipant.role);
         }
-
-        // Initialize WebSocket connection
-        cleanupSocketRef.current = initSocketListeners(safeRoom.roomCode, savedUsername, savedUserId);
       } catch (err: unknown) {
         if (!isMounted) return;
         if (err instanceof AppApiError) {
@@ -270,15 +132,12 @@ export const RoomPage: React.FC = () => {
       }
     };
 
-    checkAndInitRoom();
+    fetchRoom();
 
     return () => {
       isMounted = false;
-      if (cleanupSocketRef.current) {
-        cleanupSocketRef.current();
-      }
     };
-  }, [roomCode, initSocketListeners]);
+  }, [roomCode]);
 
   // Handle direct join form submission
   const handleDirectJoinSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -309,16 +168,8 @@ export const RoomPage: React.FC = () => {
       setCurrentUsername(result.participant.username);
       setCurrentRole(result.participant.role);
 
-      setRoom(result.room);
-      setCurrentTime(result.room.playbackTime);
+      setInitialRoom(result.room);
       setNeedsJoin(false);
-
-      // Connect socket
-      cleanupSocketRef.current = initSocketListeners(
-        result.room.roomCode,
-        result.participant.username,
-        result.participant.userId
-      );
     } catch (err: unknown) {
       if (err instanceof AppApiError) {
         setDirectJoinError(err.message);
@@ -330,73 +181,20 @@ export const RoomPage: React.FC = () => {
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // LOCAL USER PLAYBACK ACTIONS (Initiated by Authorized Host / Moderator)
-  // ---------------------------------------------------------------------------
-
-  const handleLocalPlay = () => {
-    if (!isHostOrMod) return;
-    setRoom((prev) => (prev ? { ...prev, playbackState: 'playing' } : prev));
-    playerRef.current?.applyRemotePlay(currentTime);
-    socketService.play({ currentTime });
-  };
-
-  const handleLocalPause = () => {
-    if (!isHostOrMod) return;
-    setRoom((prev) => (prev ? { ...prev, playbackState: 'paused' } : prev));
-    playerRef.current?.applyRemotePause(currentTime);
-    socketService.pause({ currentTime });
-  };
-
-  const handleLocalSeek = (newTime: number) => {
-    if (!isHostOrMod) return;
-    setCurrentTime(newTime);
-    setRoom((prev) => (prev ? { ...prev, playbackTime: newTime } : prev));
-    playerRef.current?.applyRemoteSeek(newTime);
-    socketService.seek({ time: newTime });
-  };
-
-  const handleLocalChangeVideo = (newVideoId: string) => {
-    if (!isHostOrMod) return;
-    playerRef.current?.applyRemoteChangeVideo(newVideoId, 0, 'paused');
-    socketService.changeVideo({ videoId: newVideoId });
-  };
-
-  // Called when Host/Mod clicks play directly inside the YouTube IFrame
-  const handleIframeDirectPlay = (time: number) => {
-    if (!isHostOrMod) return;
-    setRoom((prev) => (prev ? { ...prev, playbackState: 'playing', playbackTime: time } : prev));
-    socketService.play({ currentTime: time });
-  };
-
-  // Called when Host/Mod clicks pause directly inside the YouTube IFrame
-  const handleIframeDirectPause = (time: number) => {
-    if (!isHostOrMod) return;
-    setRoom((prev) => (prev ? { ...prev, playbackState: 'paused', playbackTime: time } : prev));
-    socketService.pause({ currentTime: time });
-  };
-
-  const handleTimeUpdate = (time: number, totalDuration: number) => {
-    setCurrentTime(time);
-    if (totalDuration > 0 && totalDuration !== duration) {
-      setDuration(totalDuration);
-    }
-  };
-
   // Loading View
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-20">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-400 text-sm">Connecting to room...</span>
+          <span className="text-slate-400 text-sm">Connecting to watch party...</span>
         </div>
       </div>
     );
   }
 
   // Error View
-  if (error || !room) {
+  if (error || (!room && !initialRoom)) {
     return (
       <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
         <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-sm">
@@ -419,8 +217,33 @@ export const RoomPage: React.FC = () => {
     );
   }
 
+  // Kicked Notification Modal
+  if (removedNotice) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
+        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-lg">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4">
+            <FiAlertCircle className="w-6 h-6" />
+          </div>
+          <h2 className="text-xl font-semibold text-white mb-2">Removed from Room</h2>
+          <p className="text-slate-300 text-sm mb-6 leading-relaxed">{removedNotice}</p>
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.clear();
+              navigate('/');
+            }}
+            className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Direct Link Join Prompt: User arrived via /room/:roomCode without an active session
-  if (needsJoin) {
+  if (needsJoin && initialRoom) {
     return (
       <div className="flex-1 flex items-center justify-center py-12 sm:py-20 px-4">
         <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 shadow-sm">
@@ -431,7 +254,7 @@ export const RoomPage: React.FC = () => {
             <h2 className="text-xl font-semibold text-white">Join Watch Party</h2>
           </div>
           <p className="text-slate-400 text-xs sm:text-sm mb-5 leading-relaxed">
-            You were invited to room <span className="font-mono text-white font-medium">{room.roomCode}</span>. Enter your username to enter the party.
+            You were invited to room <span className="font-mono text-white font-medium">{initialRoom.roomCode}</span>. Enter your username to enter the party.
           </p>
 
           {directJoinError && (
@@ -510,16 +333,26 @@ export const RoomPage: React.FC = () => {
     );
   }
 
+  const activeRoom = room || initialRoom!;
+
   return (
     <div className="flex-1 flex flex-col gap-5 sm:gap-6 w-full max-w-7xl mx-auto overflow-x-hidden">
       {/* 1. Room Header (Room code, Room link, Current user, Current role, Participant count) */}
       <RoomHeader
-        roomCode={room.roomCode}
+        roomCode={activeRoom.roomCode}
         currentUser={currentUsername}
         currentRole={currentRole}
-        participantCount={room.participants.length}
+        participantCount={activeRoom.participants.length}
         socketConnected={socketConnected}
       />
+
+      {/* Reconnecting Alert Banner */}
+      {isReconnecting && (
+        <div role="status" className="p-3 rounded-lg bg-amber-950/70 border border-amber-800 text-amber-200 text-xs flex items-center gap-2">
+          <FiRefreshCw className="w-4 h-4 shrink-0 text-amber-400 animate-spin" />
+          <span>Reconnecting to Watch Party server...</span>
+        </div>
+      )}
 
       {/* Socket Error Toast/Banner */}
       {socketError && (
@@ -536,36 +369,36 @@ export const RoomPage: React.FC = () => {
           {/* A. YouTube Player (Video First on Mobile) */}
           <YouTubePlayer
             ref={playerRef}
-            videoId={room.currentVideoId}
+            videoId={activeRoom.currentVideoId}
             isHostOrMod={isHostOrMod}
-            onLocalPlay={handleIframeDirectPlay}
-            onLocalPause={handleIframeDirectPause}
-            onTimeUpdate={handleTimeUpdate}
+            onLocalPlay={actions.handleIframePlay}
+            onLocalPause={actions.handleIframePause}
+            onTimeUpdate={actions.handleTimeUpdate}
           />
 
           {/* B. Playback Controls */}
           <PlaybackControls
-            playbackState={room.playbackState}
+            playbackState={activeRoom.playbackState}
             currentTime={currentTime}
             duration={duration}
             isHostOrMod={isHostOrMod}
-            onPlay={handleLocalPlay}
-            onPause={handleLocalPause}
-            onSeek={handleLocalSeek}
+            onPlay={actions.play}
+            onPause={actions.pause}
+            onSeek={actions.seek}
           />
 
           {/* C. Video URL / Input Area */}
           <VideoUrlInput
-            currentVideoId={room.currentVideoId}
+            currentVideoId={activeRoom.currentVideoId}
             isHostOrMod={isHostOrMod}
-            onChangeVideo={handleLocalChangeVideo}
+            onChangeVideo={actions.changeVideo}
           />
         </div>
 
         {/* Sidebar Column: Participants Panel */}
         <div className="lg:col-span-1 w-full flex flex-col">
           <ParticipantsPanel
-            participants={room.participants}
+            participants={activeRoom.participants}
             currentUserId={currentUserId}
           />
         </div>
