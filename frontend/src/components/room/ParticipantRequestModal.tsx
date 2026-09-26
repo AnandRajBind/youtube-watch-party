@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FiX,
   FiPlay,
@@ -35,6 +35,15 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
   const [videoInput, setVideoInput] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -69,8 +78,12 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
       aria-modal="true"
       aria-labelledby="request-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs"
+      onClick={onClose}
     >
-      <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-5 sm:p-6 shadow-xl flex flex-col gap-4">
+      <div
+        className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-5 sm:p-6 shadow-xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div>

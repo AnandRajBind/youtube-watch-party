@@ -57,7 +57,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+      className="fixed bottom-3 sm:bottom-5 right-3 sm:right-5 z-50 flex flex-col gap-2.5 max-w-[calc(100vw-1.5rem)] sm:max-w-sm w-full pointer-events-none"
     >
       {notifications.map((n) => (
         <div

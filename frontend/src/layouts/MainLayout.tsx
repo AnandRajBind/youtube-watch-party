@@ -46,10 +46,10 @@ export const MainLayout: React.FC = () => {
           </Link>
 
           {/* Server Connection Status Badge */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700/50">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-400 bg-slate-800/80 px-2.5 sm:px-3 py-1.5 rounded-full border border-slate-700/50">
               <FiRadio
-                className={`w-3.5 h-3.5 ${
+                className={`w-3.5 h-3.5 shrink-0 ${
                   serverOnline === true
                     ? 'text-emerald-400 animate-pulse'
                     : serverOnline === false
@@ -58,11 +58,17 @@ export const MainLayout: React.FC = () => {
                 }`}
               />
               <span>
-                {serverOnline === true
-                  ? 'Backend Connected'
-                  : serverOnline === false
-                    ? 'Backend Offline'
-                    : 'Connecting...'}
+                {serverOnline === true ? (
+                  <>
+                    <span className="hidden sm:inline">Backend </span>Connected
+                  </>
+                ) : serverOnline === false ? (
+                  <>
+                    <span className="hidden sm:inline">Backend </span>Offline
+                  </>
+                ) : (
+                  'Connecting...'
+                )}
               </span>
             </div>
           </div>
@@ -70,7 +76,7 @@ export const MainLayout: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 flex flex-col">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-6 py-4 sm:py-6 md:py-8 flex flex-col">
         <Outlet />
       </main>
 

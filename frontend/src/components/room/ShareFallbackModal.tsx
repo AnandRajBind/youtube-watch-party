@@ -57,7 +57,7 @@ export const ShareFallbackModal: React.FC<ShareFallbackModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4"
+        className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
