@@ -11,11 +11,17 @@ export const SOCKET_EVENTS = {
   PAUSE: 'pause',
   SEEK: 'seek',
   CHANGE_VIDEO: 'change_video',
+  ASSIGN_ROLE: 'assign_role',
+  REMOVE_PARTICIPANT: 'remove_participant',
+  TRANSFER_HOST: 'transfer_host',
 
   // Server to Client
   USER_JOINED: 'user_joined',
   USER_LEFT: 'user_left',
   PARTICIPANT_UPDATE: 'participant_update',
+  ROLE_ASSIGNED: 'role_assigned',
+  PARTICIPANT_REMOVED: 'participant_removed',
+  HOST_TRANSFERRED: 'host_transferred',
   ERROR: 'error',
 } as const;
 
@@ -48,6 +54,21 @@ export interface SeekPayload {
 
 export interface ChangeVideoPayload {
   videoId: string;
+}
+
+export interface AssignRolePayload {
+  userId?: string;
+  role?: string;
+  targetUserId?: string;
+  newRole?: string;
+}
+
+export interface RemoveParticipantPayload {
+  targetUserId: string;
+}
+
+export interface TransferHostPayload {
+  targetUserId: string;
 }
 
 // Runtime Memory Representation of a Connected Participant
@@ -121,6 +142,26 @@ export interface ChangeVideoBroadcastPayload {
   currentTime: number;
   serverTimestamp: number;
   triggeredBy: string;
+}
+
+export interface RoleAssignedBroadcastPayload {
+  userId: string;
+  role: Role;
+  targetUserId: string;
+  newRole: Role;
+  updatedBy: string;
+}
+
+export interface ParticipantRemovedBroadcastPayload {
+  targetUserId: string;
+  removedBy: string;
+  reason?: string;
+}
+
+export interface HostTransferredBroadcastPayload {
+  previousHostUserId: string;
+  newHostUserId: string;
+  updatedBy: string;
 }
 
 export interface SocketErrorPayload {

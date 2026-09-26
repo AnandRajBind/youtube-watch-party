@@ -14,6 +14,8 @@ import {
 } from '../socketTypes';
 import { logger } from '../../utils/logger';
 
+import { canControlPlayback } from '../../services/permissionService';
+
 interface AuthorizedContext {
   roomCode: string;
   userId: string;
@@ -57,8 +59,8 @@ export function registerSyncHandlers(io: SocketIOServer, socket: CustomSocket): 
     // 3. Determine actual role from server-side state
     const actualRole = await checkRole(roomCode, userId);
 
-    // 4. Verify permission (Host or Moderator only)
-    if (actualRole !== Role.HOST && actualRole !== Role.MODERATOR) {
+    // 4. Verify permission via centralized permission service (Host or Moderator only)
+    if (!canControlPlayback(actualRole)) {
       logger.warn(
         `Unauthorized playback attempt: [event=${eventName}, user=${persistentParticipant.username}, role=${actualRole}, room=${roomCode}]`
       );

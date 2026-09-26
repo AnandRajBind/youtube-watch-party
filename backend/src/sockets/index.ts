@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { registerRoomHandlers } from './handlers/roomHandler';
 import { registerSyncHandlers } from './handlers/syncHandler';
+import { registerRoleHandlers } from './handlers/roleHandler';
 import { CustomSocket } from './socketTypes';
 
 let io: SocketIOServer | null = null;
@@ -33,6 +34,9 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
 
     // Register server-side playback synchronization handlers
     registerSyncHandlers(io!, socket);
+
+    // Register role-based access control and member management handlers
+    registerRoleHandlers(io!, socket);
   });
 
   return io;

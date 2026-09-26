@@ -109,6 +109,22 @@ export function getOnlineParticipantsInRoom(roomCode: string): RuntimeParticipan
   return participants;
 }
 
+export function getSocketIdsForUser(roomCode: string, userId: string): string[] {
+  const userKey = getUserKey(roomCode, userId);
+  const sockets = userToSockets.get(userKey);
+  return sockets ? Array.from(sockets) : [];
+}
+
+export function updateParticipantRoleInRuntime(roomCode: string, userId: string, newRole: Role): void {
+  const socketIds = getSocketIdsForUser(roomCode, userId);
+  for (const sId of socketIds) {
+    const p = socketToParticipant.get(sId);
+    if (p) {
+      p.role = newRole;
+    }
+  }
+}
+
 // ============================================================================
 // 2. HELPER FUNCTIONS REQUIRED FOR ROOM SOCKET OPERATIONS
 // ============================================================================

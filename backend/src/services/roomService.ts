@@ -331,8 +331,8 @@ export class RoomService {
     roomCode: string,
     requesterUserId: string,
     targetUserId: string,
-    newRole: Role.MODERATOR | Role.PARTICIPANT
-  ): Promise<{ targetUserId: string; newRole: Role; updatedBy: string }> {
+    newRole: Role | string
+  ): Promise<{ userId: string; role: Role; targetUserId: string; newRole: Role; updatedBy: string }> {
     const room = await RoomModel.findOne({ roomCode: roomCode?.trim().toUpperCase() });
     if (!room) {
       throw ApiError.notFound('Room not found', 'ROOM_NOT_FOUND');
@@ -340,27 +340,51 @@ export class RoomService {
 
     const requester = room.participants.find((p) => p.userId === requesterUserId);
     if (!requester) {
-      throw ApiError.unauthorized('Requester is not a member of this room');
+      throw ApiError.unauthorized('Requester is not a member of this room', 'NOT_A_MEMBER');
     }
 
     // Backend permission check: ONLY HOST can assign roles
     syncService.assertCanManageRoles(requester.role);
 
+    // Reject attempt to assign host through this event
+    const normalizedRole = (newRole || '').toLowerCase();
+    if (normalizedRole === Role.HOST || normalizedRole === 'host') {
+      throw ApiError.badRequest(
+        'Cannot assign host role through assign_role event. Multiple hosts are not allowed. Use transfer_host to change room ownership.',
+        'CANNOT_ASSIGN_HOST_ROLE'
+      );
+    }
+
+    // Target role must be either moderator or participant
+    if (normalizedRole !== Role.MODERATOR && normalizedRole !== Role.PARTICIPANT) {
+      throw ApiError.badRequest(
+        "Invalid role: Target role must be either 'moderator' or 'participant'",
+        'INVALID_ROLE'
+      );
+    }
+
     const target = room.participants.find((p) => p.userId === targetUserId);
     if (!target) {
-      throw ApiError.notFound('Target participant not found in room');
+      throw ApiError.notFound('Target user not found in this room', 'USER_NOT_FOUND');
     }
 
+    // Protect Host role: host role cannot be altered via assign_role
     if (target.userId === room.hostUserId) {
-      throw ApiError.badRequest('Cannot alter the role of the Host');
+      throw ApiError.badRequest(
+        'Cannot alter the role of the room Host. The host role is protected.',
+        'PROTECTED_HOST_ROLE'
+      );
     }
 
-    target.role = newRole;
+    const validatedRole = normalizedRole as Role.MODERATOR | Role.PARTICIPANT;
+    target.role = validatedRole;
     await room.save();
 
     return {
+      userId: targetUserId,
+      role: validatedRole,
       targetUserId,
-      newRole,
+      newRole: validatedRole,
       updatedBy: requester.username,
     };
   }
@@ -402,6 +426,57 @@ export class RoomService {
     return {
       targetUserId,
       removedBy: requester.username,
+    };
+  }
+
+  /**
+   * Transfers room Host ownership to another participant.
+   * Backend enforces that ONLY the current Host can transfer room ownership.
+   */
+  public async transferHost(
+    roomCode: string,
+    requesterUserId: string,
+    targetUserId: string
+  ): Promise<{ previousHostUserId: string; newHostUserId: string; updatedBy: string }> {
+    const room = await RoomModel.findOne({ roomCode: roomCode?.trim().toUpperCase() });
+    if (!room) {
+      throw ApiError.notFound('Room not found', 'ROOM_NOT_FOUND');
+    }
+
+    const requester = room.participants.find((p) => p.userId === requesterUserId);
+    if (!requester) {
+      throw ApiError.unauthorized('Requester is not a member of this room');
+    }
+
+    // Backend permission check: ONLY HOST can transfer host
+    syncService.assertCanTransferHost(requester.role);
+    if (room.hostUserId !== requesterUserId) {
+      throw ApiError.forbidden(
+        'Host transfer denied: Only the current Host can transfer room ownership.',
+        'FORBIDDEN_HOST_TRANSFER'
+      );
+    }
+
+    if (requesterUserId === targetUserId) {
+      throw ApiError.badRequest('Target user is already the Host');
+    }
+
+    const target = room.participants.find((p) => p.userId === targetUserId);
+    if (!target) {
+      throw ApiError.notFound('Target participant not found in room');
+    }
+
+    // Previous host becomes Moderator, target becomes Host
+    requester.role = Role.MODERATOR;
+    target.role = Role.HOST;
+    room.hostUserId = targetUserId;
+
+    await room.save();
+
+    return {
+      previousHostUserId: requesterUserId,
+      newHostUserId: targetUserId,
+      updatedBy: requester.username,
     };
   }
 }

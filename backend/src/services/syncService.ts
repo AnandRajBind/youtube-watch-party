@@ -1,5 +1,11 @@
 import { PlaybackState, Role } from '../types/room.types';
 import { ApiError } from '../utils/apiError';
+import {
+  canControlPlayback,
+  canManageRoles,
+  canRemoveParticipant,
+  canTransferHost,
+} from './permissionService';
 
 export class SyncService {
   /**
@@ -9,7 +15,7 @@ export class SyncService {
   public calculateCurrentPlaybackTime(playbackState: PlaybackState, playbackTime: number, lastUpdatedAt: Date): number {
     if (playbackState === PlaybackState.PAUSED) {
       return playbackTime;
-  }
+    }
 
     const elapsedSeconds = (Date.now() - new Date(lastUpdatedAt).getTime()) / 1000;
     const computedTime = playbackTime + Math.max(0, elapsedSeconds);
@@ -22,7 +28,7 @@ export class SyncService {
    * Host and Moderator are allowed; Participant is rejected.
    */
   public assertCanControlPlayback(role: Role): void {
-    if (role !== Role.HOST && role !== Role.MODERATOR) {
+    if (!canControlPlayback(role)) {
       throw ApiError.forbidden(
         'Playback control denied: Only the Host or a Moderator can control video playback.',
         'FORBIDDEN_PLAYBACK_CONTROL'
@@ -35,7 +41,7 @@ export class SyncService {
    * Only Host is allowed.
    */
   public assertCanManageRoles(role: Role): void {
-    if (role !== Role.HOST) {
+    if (!canManageRoles(role)) {
       throw ApiError.forbidden(
         'Role management denied: Only the Host can assign or change user roles.',
         'FORBIDDEN_ROLE_MANAGEMENT'
@@ -48,10 +54,23 @@ export class SyncService {
    * Only Host is allowed.
    */
   public assertCanRemoveParticipant(role: Role): void {
-    if (role !== Role.HOST) {
+    if (!canRemoveParticipant(role)) {
       throw ApiError.forbidden(
         'Removal denied: Only the Host can remove participants from the room.',
         'FORBIDDEN_REMOVE_PARTICIPANT'
+      );
+    }
+  }
+
+  /**
+   * Validates if the user has permission to transfer host.
+   * Only Host is allowed.
+   */
+  public assertCanTransferHost(role: Role): void {
+    if (!canTransferHost(role)) {
+      throw ApiError.forbidden(
+        'Host transfer denied: Only the current Host can transfer room ownership.',
+        'FORBIDDEN_HOST_TRANSFER'
       );
     }
   }
