@@ -1,41 +1,43 @@
 export enum Role {
-  HOST = 'HOST',
-  MODERATOR = 'MODERATOR',
-  PARTICIPANT = 'PARTICIPANT',
+  HOST = 'host',
+  MODERATOR = 'moderator',
+  PARTICIPANT = 'participant',
 }
 
-export enum PlaybackStatus {
-  PLAYING = 'PLAYING',
-  PAUSED = 'PAUSED',
+export enum PlaybackState {
+  PLAYING = 'playing',
+  PAUSED = 'paused',
 }
 
+/**
+ * Persistent participant data stored in MongoDB.
+ * Notice: Volatile WebSocket connection identifiers (e.g. socketId)
+ * are excluded from MongoDB and managed in runtime memory.
+ */
 export interface IParticipant {
   userId: string;
-  socketId: string;
   username: string;
   role: Role;
   joinedAt: Date;
+}
+
+/**
+ * Augmented participant interface including transient runtime presence state.
+ */
+export interface IParticipantPresence extends IParticipant {
   isOnline: boolean;
 }
 
-export interface IVideoState {
-  videoId: string;
-  title?: string;
-  duration?: number;
-}
-
-export interface IPlaybackState {
-  status: PlaybackStatus;
-  currentTime: number;
-  lastUpdatedAt: Date;
-}
-
+/**
+ * Persistent Room document structure stored in MongoDB.
+ */
 export interface IRoom {
   roomCode: string;
-  title: string;
   hostUserId: string;
-  video: IVideoState;
-  playback: IPlaybackState;
+  currentVideoId: string;
+  playbackState: PlaybackState;
+  playbackTime: number;
+  lastUpdatedAt: Date;
   participants: IParticipant[];
   createdAt: Date;
   updatedAt: Date;

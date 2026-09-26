@@ -1,16 +1,32 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { roomService } from '../../services/roomService';
+import { connectionManager } from '../connectionManager';
 import { AssignRolePayload, RemoveParticipantPayload, SOCKET_EVENTS } from '../../types/socket.types';
 import { logger } from '../../utils/logger';
 
 export function registerRoleHandlers(io: SocketIOServer, socket: Socket): void {
+  function getRequesterUserId(roomCode: string): string | null {
+    for (const [sId, conn] of (connectionManager as any).socketToConnection.entries()) {
+      if (sId === socket.id && conn.roomCode === roomCode.trim().toUpperCase()) {
+        return conn.userId;
+      }
+    }
+    return null;
+  }
+
   // 1. Assign Role (Promote / Demote)
   socket.on(SOCKET_EVENTS.ASSIGN_ROLE, async (payload: AssignRolePayload) => {
     try {
       const { roomCode, targetUserId, newRole } = payload;
-      const { updatedBy } = await roomService.assignRole(roomCode, socket.id, targetUserId, newRole);
-
       const code = roomCode.trim().toUpperCase();
+      const requesterUserId = getRequesterUserId(code);
+      if (!requesterUserId) {
+        socket.emit(SOCKET_EVENTS.ERROR, { code: 'UNAUTHORIZED', message: 'You must join the room first' });
+        return;
+      }
+
+      const { updatedBy } = await roomService.assignRole(code, requesterUserId, targetUserId, newRole);
+
       io.to(code).emit(SOCKET_EVENTS.ROLE_ASSIGNED, {
         targetUserId,
         newRole,
@@ -29,16 +45,18 @@ export function registerRoleHandlers(io: SocketIOServer, socket: Socket): void {
   socket.on(SOCKET_EVENTS.REMOVE_PARTICIPANT, async (payload: RemoveParticipantPayload) => {
     try {
       const { roomCode, targetUserId } = payload;
-      const { targetSocketId, removedBy } = await roomService.removeParticipant(
-        roomCode,
-        socket.id,
-        targetUserId
-      );
-
       const code = roomCode.trim().toUpperCase();
+      const requesterUserId = getRequesterUserId(code);
+      if (!requesterUserId) {
+        socket.emit(SOCKET_EVENTS.ERROR, { code: 'UNAUTHORIZED', message: 'You must join the room first' });
+        return;
+      }
 
-      // Notify the removed user specifically
-      if (targetSocketId) {
+      const { removedBy } = await roomService.removeParticipant(code, requesterUserId, targetUserId);
+
+      // Notify and disconnect all target user's active sockets in this room
+      const targetSockets = connectionManager.getSocketIdsForUser(targetUserId, code);
+      for (const targetSocketId of targetSockets) {
         const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (targetSocket) {
           targetSocket.emit(SOCKET_EVENTS.PARTICIPANT_REMOVED, {
@@ -46,6 +64,7 @@ export function registerRoleHandlers(io: SocketIOServer, socket: Socket): void {
             reason: `You were removed from the room by ${removedBy}`,
           });
           await targetSocket.leave(code);
+          connectionManager.removeConnection(targetSocketId);
         }
       }
 

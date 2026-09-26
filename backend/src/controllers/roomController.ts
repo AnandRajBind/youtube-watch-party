@@ -4,8 +4,8 @@ import { roomService } from '../services/roomService';
 export class RoomController {
   public async createRoom(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { username, initialVideoUrl, title, userId } = req.body;
-      const result = await roomService.createRoom(username, initialVideoUrl, title, userId);
+      const { username, initialVideoUrl, userId } = req.body;
+      const result = await roomService.createRoom(username, initialVideoUrl, userId);
 
       res.status(201).json({
         success: true,

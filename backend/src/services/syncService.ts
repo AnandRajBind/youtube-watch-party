@@ -1,18 +1,18 @@
-import { IPlaybackState, PlaybackStatus, Role } from '../types/room.types';
+import { PlaybackState, Role } from '../types/room.types';
 import { ApiError } from '../utils/apiError';
 
 export class SyncService {
   /**
    * Calculates current authoritative virtual time of playback.
-   * If video is playing, elapsed real-time since last update is added to currentTime.
+   * If video is playing, elapsed real-time since last update is added to recorded playbackTime.
    */
-  public calculateCurrentPlaybackTime(playback: IPlaybackState): number {
-    if (playback.status === PlaybackStatus.PAUSED) {
-      return playback.currentTime;
-    }
+  public calculateCurrentPlaybackTime(playbackState: PlaybackState, playbackTime: number, lastUpdatedAt: Date): number {
+    if (playbackState === PlaybackState.PAUSED) {
+      return playbackTime;
+  }
 
-    const elapsedSeconds = (Date.now() - new Date(playback.lastUpdatedAt).getTime()) / 1000;
-    const computedTime = playback.currentTime + Math.max(0, elapsedSeconds);
+    const elapsedSeconds = (Date.now() - new Date(lastUpdatedAt).getTime()) / 1000;
+    const computedTime = playbackTime + Math.max(0, elapsedSeconds);
 
     return Number(computedTime.toFixed(2));
   }

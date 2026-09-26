@@ -1,4 +1,4 @@
-import { IParticipant, IPlaybackState, IVideoState, Role } from './room.types';
+import { IParticipantPresence, PlaybackState, Role } from './room.types';
 
 // Standardized WebSocket Event Names
 export const SOCKET_EVENTS = {
@@ -67,14 +67,16 @@ export interface RemoveParticipantPayload {
 
 // Server -> Client Payloads
 export interface SyncStateResponsePayload {
-  video: IVideoState;
-  playback: IPlaybackState & { serverTimestamp: number };
-  participants: IParticipant[];
+  currentVideoId: string;
+  playbackState: PlaybackState;
+  playbackTime: number;
+  serverTimestamp: number;
+  participants: IParticipantPresence[];
   userRole: Role;
 }
 
 export interface UserJoinedBroadcastPayload {
-  user: IParticipant;
+  user: IParticipantPresence;
   participantCount: number;
 }
 
@@ -97,9 +99,9 @@ export interface SeekBroadcastPayload {
 }
 
 export interface VideoChangedBroadcastPayload {
-  video: IVideoState;
-  status: string;
-  currentTime: number;
+  videoId: string;
+  playbackState: PlaybackState;
+  playbackTime: number;
   serverTimestamp: number;
   triggeredBy: string;
 }
