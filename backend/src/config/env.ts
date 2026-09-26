@@ -2,7 +2,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { z } from 'zod';
 
-// Load .env file from project root or backend directory
+// Load .env file safely from current working directory or backend root
+dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const envSchema = z.object({
@@ -16,11 +18,8 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  MONGO_URI: z
-    .string({
-      required_error: 'MONGO_URI is required for database persistence',
-    })
-    .min(1, 'MONGO_URI cannot be empty'),
+  MONGODB_URI: z.string().optional(),
+  MONGO_URI: z.string().optional(),
   CLIENT_URL: z
     .string()
     .default('http://localhost:5173')
@@ -40,5 +39,25 @@ if (!parsedEnv.success) {
   process.exit(1);
 }
 
-export const env = parsedEnv.data;
+// Resolve MongoDB connection string from either MONGODB_URI or MONGO_URI
+const resolvedMongoUri =
+  parsedEnv.data.MONGODB_URI ||
+  parsedEnv.data.MONGO_URI ||
+  process.env.MONGODB_URI ||
+  process.env.MONGO_URI;
+
+if (!resolvedMongoUri) {
+  console.error('❌ Invalid environment variables:');
+  console.error(' - MONGODB_URI (or MONGO_URI): required for database persistence');
+  process.exit(1);
+}
+
+export const env = {
+  PORT: parsedEnv.data.PORT,
+  NODE_ENV: parsedEnv.data.NODE_ENV,
+  MONGODB_URI: resolvedMongoUri,
+  MONGO_URI: resolvedMongoUri,
+  CLIENT_URL: parsedEnv.data.CLIENT_URL,
+};
+
 export type Env = typeof env;

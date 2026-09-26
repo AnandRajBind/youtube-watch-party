@@ -7,11 +7,14 @@ import {
   joinRoomSchema,
 } from '../validations/roomValidation';
 
+import { roomCreationRateLimiter } from '../middleware/rateLimiter';
+
 const router = Router();
 
-// POST /api/rooms - Create a new watch party room
+// POST /api/rooms - Create a new watch party room (Rate-limited to 30 rooms/min per IP)
 router.post(
   '/',
+  roomCreationRateLimiter,
   validateRequest(createRoomSchema),
   (req, res, next) => roomController.createRoom(req, res, next)
 );
