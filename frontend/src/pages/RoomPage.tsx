@@ -24,13 +24,16 @@ import { SOCKET_EVENTS } from '../types/socket.types';
 import { validateUsername } from '../utils/roomCode';
 
 import { RoomHeader } from '../components/room/RoomHeader';
-import { YouTubePlayer } from '../components/room/YouTubePlayer';
+import { YouTubePlayer, type YouTubePlayerHandle } from '../components/room/YouTubePlayer';
 import { PlaybackControls } from '../components/room/PlaybackControls';
 import { VideoUrlInput } from '../components/room/VideoUrlInput';
 import { ParticipantsPanel } from '../components/room/ParticipantsPanel';
 
 export const RoomPage: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
+
+  // Imperative handle to control the YouTube player cleanly without feedback loops
+  const playerRef = useRef<YouTubePlayerHandle>(null);
 
   // Room & State
   const [room, setRoom] = useState<SafeRoomDto | null>(null);
@@ -81,6 +84,7 @@ export const RoomPage: React.FC = () => {
         setSocketConnected(false);
       };
 
+      // 1. Authoritative Remote State Snapshot
       const handleSyncState = (data: SyncStatePayload) => {
         setRoom((prev) =>
           prev
@@ -99,23 +103,33 @@ export const RoomPage: React.FC = () => {
           setCurrentRole(data.userRole);
           sessionStorage.setItem('watchparty_role', data.userRole);
         }
+
+        // Apply authoritative state to YouTube player without emitting back
+        playerRef.current?.applyRemoteChangeVideo(data.videoId, data.currentTime, data.playState);
       };
 
+      // 2. Authoritative Remote Play
       const handlePlay = (data: PlaybackBroadcastPayload) => {
         setRoom((prev) => (prev ? { ...prev, playbackState: 'playing', playbackTime: data.currentTime } : prev));
         setCurrentTime(data.currentTime);
+        playerRef.current?.applyRemotePlay(data.currentTime);
       };
 
+      // 3. Authoritative Remote Pause
       const handlePause = (data: PlaybackBroadcastPayload) => {
         setRoom((prev) => (prev ? { ...prev, playbackState: 'paused', playbackTime: data.currentTime } : prev));
         setCurrentTime(data.currentTime);
+        playerRef.current?.applyRemotePause(data.currentTime);
       };
 
+      // 4. Authoritative Remote Seek
       const handleSeek = (data: SeekBroadcastPayload) => {
         setRoom((prev) => (prev ? { ...prev, playbackTime: data.currentTime } : prev));
         setCurrentTime(data.currentTime);
+        playerRef.current?.applyRemoteSeek(data.currentTime);
       };
 
+      // 5. Authoritative Remote Change Video
       const handleChangeVideo = (data: ChangeVideoBroadcastPayload) => {
         setRoom((prev) =>
           prev
@@ -128,8 +142,10 @@ export const RoomPage: React.FC = () => {
             : prev
         );
         setCurrentTime(data.currentTime);
+        playerRef.current?.applyRemoteChangeVideo(data.videoId, data.currentTime, data.playState);
       };
 
+      // 6. Real-Time Participant Presence Updates
       const handleParticipantUpdate = (data: ParticipantUpdatePayload) => {
         setRoom((prev) =>
           prev
@@ -142,6 +158,7 @@ export const RoomPage: React.FC = () => {
         );
       };
 
+      // 7. Role Assigned
       const handleRoleAssigned = (data: RoleAssignedBroadcastPayload) => {
         const myId = sessionStorage.getItem('watchparty_userId');
         if (data.targetUserId === myId || data.userId === myId) {
@@ -151,6 +168,7 @@ export const RoomPage: React.FC = () => {
         }
       };
 
+      // 8. Participant Removed
       const handleParticipantRemoved = (data: ParticipantRemovedBroadcastPayload) => {
         const myId = sessionStorage.getItem('watchparty_userId');
         if (data.targetUserId === myId) {
@@ -159,6 +177,7 @@ export const RoomPage: React.FC = () => {
         }
       };
 
+      // 9. Error from Server
       const handleSocketError = (data: SocketErrorPayload) => {
         setSocketError(data.message || 'An error occurred during real-time sync.');
         setTimeout(() => setSocketError(null), 5000);
@@ -311,29 +330,50 @@ export const RoomPage: React.FC = () => {
     }
   };
 
-  // Playback Control Handlers
-  const handlePlay = () => {
+  // ---------------------------------------------------------------------------
+  // LOCAL USER PLAYBACK ACTIONS (Initiated by Authorized Host / Moderator)
+  // ---------------------------------------------------------------------------
+
+  const handleLocalPlay = () => {
     if (!isHostOrMod) return;
     setRoom((prev) => (prev ? { ...prev, playbackState: 'playing' } : prev));
+    playerRef.current?.applyRemotePlay(currentTime);
     socketService.play({ currentTime });
   };
 
-  const handlePause = () => {
+  const handleLocalPause = () => {
     if (!isHostOrMod) return;
     setRoom((prev) => (prev ? { ...prev, playbackState: 'paused' } : prev));
+    playerRef.current?.applyRemotePause(currentTime);
     socketService.pause({ currentTime });
   };
 
-  const handleSeek = (newTime: number) => {
+  const handleLocalSeek = (newTime: number) => {
     if (!isHostOrMod) return;
     setCurrentTime(newTime);
     setRoom((prev) => (prev ? { ...prev, playbackTime: newTime } : prev));
+    playerRef.current?.applyRemoteSeek(newTime);
     socketService.seek({ time: newTime });
   };
 
-  const handleChangeVideo = (videoId: string) => {
+  const handleLocalChangeVideo = (newVideoId: string) => {
     if (!isHostOrMod) return;
-    socketService.changeVideo({ videoId });
+    playerRef.current?.applyRemoteChangeVideo(newVideoId, 0, 'paused');
+    socketService.changeVideo({ videoId: newVideoId });
+  };
+
+  // Called when Host/Mod clicks play directly inside the YouTube IFrame
+  const handleIframeDirectPlay = (time: number) => {
+    if (!isHostOrMod) return;
+    setRoom((prev) => (prev ? { ...prev, playbackState: 'playing', playbackTime: time } : prev));
+    socketService.play({ currentTime: time });
+  };
+
+  // Called when Host/Mod clicks pause directly inside the YouTube IFrame
+  const handleIframeDirectPause = (time: number) => {
+    if (!isHostOrMod) return;
+    setRoom((prev) => (prev ? { ...prev, playbackState: 'paused', playbackTime: time } : prev));
+    socketService.pause({ currentTime: time });
   };
 
   const handleTimeUpdate = (time: number, totalDuration: number) => {
@@ -495,10 +535,11 @@ export const RoomPage: React.FC = () => {
         <div className="lg:col-span-2 flex flex-col gap-4 w-full">
           {/* A. YouTube Player (Video First on Mobile) */}
           <YouTubePlayer
+            ref={playerRef}
             videoId={room.currentVideoId}
-            playbackState={room.playbackState}
-            playbackTime={currentTime}
             isHostOrMod={isHostOrMod}
+            onLocalPlay={handleIframeDirectPlay}
+            onLocalPause={handleIframeDirectPause}
             onTimeUpdate={handleTimeUpdate}
           />
 
@@ -508,20 +549,20 @@ export const RoomPage: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             isHostOrMod={isHostOrMod}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onSeek={handleSeek}
+            onPlay={handleLocalPlay}
+            onPause={handleLocalPause}
+            onSeek={handleLocalSeek}
           />
 
           {/* C. Video URL / Input Area */}
           <VideoUrlInput
             currentVideoId={room.currentVideoId}
             isHostOrMod={isHostOrMod}
-            onChangeVideo={handleChangeVideo}
+            onChangeVideo={handleLocalChangeVideo}
           />
         </div>
 
-        {/* Sidebar Column: Participants Panel (Stacked below on mobile without breaking layout) */}
+        {/* Sidebar Column: Participants Panel */}
         <div className="lg:col-span-1 w-full flex flex-col">
           <ParticipantsPanel
             participants={room.participants}
