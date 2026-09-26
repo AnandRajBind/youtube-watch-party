@@ -14,6 +14,9 @@ export const SOCKET_EVENTS = {
   ASSIGN_ROLE: 'assign_role',
   REMOVE_PARTICIPANT: 'remove_participant',
   TRANSFER_HOST: 'transfer_host',
+  REQUEST_ACTION: 'request_action',
+  APPROVE_ACTION: 'approve_action',
+  REJECT_ACTION: 'reject_action',
 
   // Server to Client
   USER_JOINED: 'user_joined',
@@ -22,6 +25,9 @@ export const SOCKET_EVENTS = {
   ROLE_ASSIGNED: 'role_assigned',
   PARTICIPANT_REMOVED: 'participant_removed',
   HOST_TRANSFERRED: 'host_transferred',
+  ACTION_REQUEST_CREATED: 'action_request_created',
+  ACTION_REQUEST_APPROVED: 'action_request_approved',
+  ACTION_REQUEST_REJECTED: 'action_request_rejected',
   ERROR: 'error',
 } as const;
 
@@ -64,12 +70,41 @@ export interface AssignRolePayload {
 }
 
 export interface RemoveParticipantPayload {
-  userId?: string;
-  targetUserId?: string;
+  targetUserId: string;
 }
 
 export interface TransferHostPayload {
   targetUserId: string;
+}
+
+export type ActionRequestType = 'play' | 'pause' | 'seek' | 'change_video';
+
+export interface RequestActionPayload {
+  action: ActionRequestType;
+  time?: number;
+  currentTime?: number;
+  videoId?: string;
+}
+
+export interface ApproveActionPayload {
+  requestId: string;
+}
+
+export interface RejectActionPayload {
+  requestId: string;
+  reason?: string;
+}
+
+export interface ActionRequestItem {
+  requestId: string;
+  roomCode: string;
+  requesterUserId: string;
+  requesterUsername: string;
+  action: ActionRequestType;
+  time?: number;
+  videoId?: string;
+  createdAt: number;
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
 }
 
 // Runtime Memory Representation of a Connected Participant
@@ -154,7 +189,6 @@ export interface RoleAssignedBroadcastPayload {
 }
 
 export interface ParticipantRemovedBroadcastPayload {
-  userId: string;
   targetUserId: string;
   removedBy: string;
   reason?: string;
@@ -164,6 +198,35 @@ export interface HostTransferredBroadcastPayload {
   previousHostUserId: string;
   newHostUserId: string;
   updatedBy: string;
+}
+
+export interface ActionRequestCreatedPayload {
+  requestId: string;
+  requesterUserId: string;
+  requesterUsername: string;
+  action: ActionRequestType;
+  time?: number;
+  videoId?: string;
+  createdAt: number;
+}
+
+export interface ActionRequestApprovedPayload {
+  requestId: string;
+  action: ActionRequestType;
+  approvedBy: string;
+  requesterUserId: string;
+  requesterUsername: string;
+  time?: number;
+  videoId?: string;
+}
+
+export interface ActionRequestRejectedPayload {
+  requestId: string;
+  action: ActionRequestType;
+  rejectedBy: string;
+  requesterUserId: string;
+  requesterUsername: string;
+  reason?: string;
 }
 
 export interface SocketErrorPayload {

@@ -105,3 +105,11 @@ export function canRemoveParticipant(role: Role): boolean {
 export function canTransferHost(role: Role): boolean {
   return hasPermission(role, Permission.TRANSFER_HOST);
 }
+
+/**
+ * Helper: checks if the role can review and approve or reject participant action requests.
+ * Allowed for Host and Moderator.
+ */
+export function canApproveAction(role: Role): boolean {
+  return canControlPlayback(role);
+}

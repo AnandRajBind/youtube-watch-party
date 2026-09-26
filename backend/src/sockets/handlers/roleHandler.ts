@@ -185,7 +185,7 @@ export function registerRoleHandlers(io: SocketIOServer, socket: CustomSocket): 
 
   // ==========================================================================
   // EVENT: remove_participant
-  // Payload: { userId: string }
+  // Payload: { targetUserId: string }
   // Only Host can remove / kick participants.
   // ==========================================================================
   socket.on(SOCKET_EVENTS.REMOVE_PARTICIPANT, async (payload: RemoveParticipantPayload) => {
@@ -195,7 +195,7 @@ export function registerRoleHandlers(io: SocketIOServer, socket: CustomSocket): 
 
       const { roomCode, userId: requesterUserId, username: requesterUsername, role: requesterRole } = auth;
 
-      // 1. Centralized permission check: Only Host can remove participants
+      // Centralized permission check: Only Host can remove participants
       if (!canRemoveParticipant(requesterRole)) {
         logger.warn(
           `Unauthorized participant removal attempt: [user=${requesterUsername}, role=${requesterRole}, room=${roomCode}]`
@@ -207,80 +207,41 @@ export function registerRoleHandlers(io: SocketIOServer, socket: CustomSocket): 
         return;
       }
 
-      // 2. Validate payload presence
-      const targetUserId = (payload?.userId || payload?.targetUserId)?.trim();
-      if (!targetUserId) {
+      if (!payload || !payload.targetUserId) {
         socket.emit(SOCKET_EVENTS.ERROR, {
           code: 'INVALID_PAYLOAD',
-          message: 'userId is required to remove participant',
+          message: 'targetUserId is required to remove participant',
         });
         return;
       }
 
-      // 3. Host cannot remove themselves
-      if (targetUserId === requesterUserId) {
-        socket.emit(SOCKET_EVENTS.ERROR, {
-          code: 'CANNOT_REMOVE_HOST',
-          message: 'Host cannot remove themselves from the room. To leave, transfer host ownership first.',
-        });
-        return;
-      }
+      const { targetUserId } = payload;
 
-      // 4. Verify target user belongs to the same room
-      const targetParticipant = await getParticipant(roomCode, targetUserId);
-      if (!targetParticipant) {
-        socket.emit(SOCKET_EVENTS.ERROR, {
-          code: 'USER_NOT_FOUND',
-          message: 'Target user does not exist in this room',
-        });
-        return;
-      }
+      // Execute removal from persistent MongoDB storage
+      await roomService.removeParticipant(roomCode, requesterUserId, targetUserId);
 
-      // Ensure target is not the host (protected role)
-      if (targetParticipant.role === Role.HOST) {
-        socket.emit(SOCKET_EVENTS.ERROR, {
-          code: 'CANNOT_REMOVE_HOST',
-          message: 'The room Host cannot be removed from the room.',
-        });
-        return;
-      }
-
-      // 5. Remove participant from persistent MongoDB storage
-      const removalResult = await roomService.removeParticipant(roomCode, requesterUserId, targetUserId);
-
-      // 6. Notify the target user before disconnecting when online
+      // Disconnect and clean target user's active sockets
       const targetSockets = getSocketIdsForUser(roomCode, targetUserId);
       for (const targetSocketId of targetSockets) {
-        const targetSocket = io.sockets.sockets.get(targetSocketId) as CustomSocket | undefined;
+        const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (targetSocket) {
-          // Notify target socket with descriptive reason
           targetSocket.emit(SOCKET_EVENTS.PARTICIPANT_REMOVED, {
-            userId: targetUserId,
             targetUserId,
             removedBy: requesterUsername,
             reason: `You were removed from the room by the Host (${requesterUsername})`,
           });
-
-          // Target socket leaves Socket.IO room channel
           await targetSocket.leave(roomCode);
-
-          // Clear cached session & runtime memory state
-          delete targetSocket.data.session;
           removeRuntimeParticipant(targetSocketId);
-
-          // Disconnect the target socket
-          targetSocket.disconnect(true);
         }
       }
 
-      // 7. Broadcast participant_removed to remaining room members
+      // Broadcast participant_removed to remaining room members
       io.to(roomCode).emit(SOCKET_EVENTS.PARTICIPANT_REMOVED, {
-        userId: removalResult.userId,
-        targetUserId: removalResult.targetUserId,
+        targetUserId,
         removedBy: requesterUsername,
       });
 
-      // 8. Broadcast refreshed participant list to remaining room members
+      // Broadcast refreshed participant list
       await broadcastParticipants(io, roomCode);
 
       logger.info(

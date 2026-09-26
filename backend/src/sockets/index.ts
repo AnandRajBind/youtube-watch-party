@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { registerRoomHandlers } from './handlers/roomHandler';
 import { registerSyncHandlers } from './handlers/syncHandler';
 import { registerRoleHandlers } from './handlers/roleHandler';
+import { registerActionRequestHandlers } from './handlers/actionRequestHandler';
 import { CustomSocket } from './socketTypes';
 
 let io: SocketIOServer | null = null;
@@ -37,6 +38,9 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
 
     // Register role-based access control and member management handlers
     registerRoleHandlers(io!, socket);
+
+    // Register participant change-request workflow handlers
+    registerActionRequestHandlers(io!, socket);
   });
 
   return io;

@@ -397,7 +397,7 @@ export class RoomService {
     roomCode: string,
     requesterUserId: string,
     targetUserId: string
-  ): Promise<{ userId: string; targetUserId: string; removedBy: string }> {
+  ): Promise<{ targetUserId: string; removedBy: string }> {
     const room = await RoomModel.findOne({ roomCode: roomCode?.trim().toUpperCase() });
     if (!room) {
       throw ApiError.notFound('Room not found', 'ROOM_NOT_FOUND');
@@ -405,30 +405,25 @@ export class RoomService {
 
     const requester = room.participants.find((p) => p.userId === requesterUserId);
     if (!requester) {
-      throw ApiError.unauthorized('Requester is not a member of this room', 'NOT_A_MEMBER');
+      throw ApiError.unauthorized('Requester is not a member of this room');
     }
 
     // Backend permission check: ONLY HOST can remove participants
     syncService.assertCanRemoveParticipant(requester.role);
 
-    // Host cannot remove themselves
     if (targetUserId === room.hostUserId || targetUserId === requester.userId) {
-      throw ApiError.badRequest(
-        'Host cannot remove themselves from the room. To leave, transfer host ownership first.',
-        'CANNOT_REMOVE_HOST'
-      );
+      throw ApiError.badRequest('Host cannot be removed from the room');
     }
 
     const targetIndex = room.participants.findIndex((p) => p.userId === targetUserId);
     if (targetIndex === -1) {
-      throw ApiError.notFound('Target user not found in this room', 'USER_NOT_FOUND');
+      throw ApiError.notFound('Target participant not found in room');
     }
 
     room.participants.splice(targetIndex, 1);
     await room.save();
 
     return {
-      userId: targetUserId,
       targetUserId,
       removedBy: requester.username,
     };
