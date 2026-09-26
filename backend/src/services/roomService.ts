@@ -1,12 +1,54 @@
 import crypto from 'crypto';
 import { RoomModel } from '../models/Room';
-import { IParticipant, IRoom, PlaybackState, Role } from '../types/room.types';
+import {
+  IParticipant,
+  IRoom,
+  PlaybackState,
+  Role,
+  SafeParticipantDto,
+  SafeRoomDto,
+} from '../types/room.types';
 import { ApiError } from '../utils/apiError';
 import { generateRoomCode } from '../utils/roomCode';
 import { extractYouTubeVideoId } from '../utils/youtube';
 import { syncService } from './syncService';
+import { connectionManager } from '../sockets/connectionManager';
 
 export class RoomService {
+  /**
+   * Transforms an IRoom into a clean, safe DTO.
+   * Strips all internal MongoDB metadata (_id, __v, expiresAt).
+   */
+  public toSafeRoomDto(room: IRoom, calculatedTime: number): SafeRoomDto {
+    const safeParticipants: SafeParticipantDto[] = room.participants.map((p) => ({
+      userId: p.userId,
+      username: p.username,
+      role: p.role,
+      joinedAt: p.joinedAt,
+      isOnline: connectionManager.isUserOnline(p.userId, room.roomCode),
+    }));
+
+    return {
+      roomCode: room.roomCode,
+      hostUserId: room.hostUserId,
+      currentVideoId: room.currentVideoId,
+      playbackState: room.playbackState,
+      playbackTime: calculatedTime,
+      lastUpdatedAt: room.lastUpdatedAt,
+      participants: safeParticipants,
+      participantCount: safeParticipants.length,
+      createdAt: room.createdAt,
+    };
+  }
+
+  /**
+   * Retrieves safe room information without exposing internal DB structures.
+   */
+  public async getSafeRoomDetails(roomCode: string): Promise<SafeRoomDto> {
+    const roomWithTime = await this.getRoomByCode(roomCode);
+    return this.toSafeRoomDto(roomWithTime, roomWithTime.currentCalculatedTime);
+  }
+
   /**
    * Creates a new watch party room in MongoDB.
    * Host is automatically assigned to the room creator.
@@ -15,7 +57,7 @@ export class RoomService {
     username: string,
     initialVideoUrl?: string,
     providedUserId?: string
-  ): Promise<{ room: IRoom; hostUser: IParticipant }> {
+  ): Promise<{ room: SafeRoomDto; hostUser: SafeParticipantDto }> {
     const trimmedUsername = username?.trim();
     if (!trimmedUsername) {
       throw ApiError.badRequest('Username is required to create a room');
@@ -60,9 +102,14 @@ export class RoomService {
       participants: [hostParticipant],
     });
 
+    const roomObj = roomDoc.toObject() as IRoom;
+
     return {
-      room: roomDoc.toObject() as IRoom,
-      hostUser: hostParticipant,
+      room: this.toSafeRoomDto(roomObj, 0),
+      hostUser: {
+        ...hostParticipant,
+        isOnline: false,
+      },
     };
   }
 
@@ -99,7 +146,11 @@ export class RoomService {
     roomCode: string,
     userId: string,
     username: string
-  ): Promise<{ room: IRoom; participant: IParticipant }> {
+  ): Promise<{
+    room: SafeRoomDto;
+    participant: SafeParticipantDto;
+    session: { userId: string; username: string; role: Role; roomCode: string };
+  }> {
     const code = roomCode?.trim().toUpperCase();
     const room = await RoomModel.findOne({ roomCode: code });
 
@@ -135,9 +186,31 @@ export class RoomService {
     room.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await room.save();
 
+    const roomObj = room.toObject() as IRoom;
+    const currentCalculatedTime = syncService.calculateCurrentPlaybackTime(
+      roomObj.playbackState,
+      roomObj.playbackTime,
+      roomObj.lastUpdatedAt
+    );
+    const safeRoom = this.toSafeRoomDto(roomObj, currentCalculatedTime);
+
+    const safeParticipant: SafeParticipantDto = {
+      userId: participant.userId,
+      username: participant.username,
+      role: participant.role,
+      joinedAt: participant.joinedAt,
+      isOnline: connectionManager.isUserOnline(participant.userId, code),
+    };
+
     return {
-      room: room.toObject() as IRoom,
-      participant: participant.toObject ? (participant.toObject() as IParticipant) : (participant as unknown as IParticipant),
+      room: safeRoom,
+      participant: safeParticipant,
+      session: {
+        userId: participant.userId,
+        username: participant.username,
+        role: participant.role,
+        roomCode: safeRoom.roomCode,
+      },
     };
   }
 

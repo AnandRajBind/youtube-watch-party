@@ -43,3 +43,32 @@ export interface IRoom {
   updatedAt: Date;
   expiresAt: Date;
 }
+
+/**
+ * Safe Participant DTO returned in REST API responses.
+ * Never exposes sensitive or internal DB fields.
+ */
+export interface SafeParticipantDto {
+  userId: string;
+  username: string;
+  role: Role;
+  joinedAt: Date;
+  isOnline: boolean;
+}
+
+/**
+ * Safe Room DTO returned in REST API responses.
+ * Hides MongoDB internals (_id, __v, expiresAt) and includes
+ * calculated virtual playback time and active online participant counts.
+ */
+export interface SafeRoomDto {
+  roomCode: string;
+  hostUserId: string;
+  currentVideoId: string;
+  playbackState: PlaybackState;
+  playbackTime: number;
+  lastUpdatedAt: Date;
+  participants: SafeParticipantDto[];
+  participantCount: number;
+  createdAt: Date;
+}
