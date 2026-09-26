@@ -1,11 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FiArrowLeft, FiUsers, FiVideo, FiShield, FiAlertTriangle } from 'react-icons/fi';
+import {
+  FiArrowLeft,
+  FiUsers,
+  FiVideo,
+  FiShield,
+  FiAlertTriangle,
+  FiAlertCircle,
+  FiLogIn,
+  FiLoader,
+} from 'react-icons/fi';
 import { roomApiService, AppApiError } from '../services/api';
 import { socketService } from '../socket/socket';
 import type { SafeRoomDto } from '../types/room.types';
 import type { SyncStatePayload } from '../types/socket.types';
 import { SOCKET_EVENTS } from '../types/socket.types';
+import { validateUsername } from '../utils/roomCode';
 
 export const RoomPage: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -15,79 +25,45 @@ export const RoomPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
 
+  // Direct Link Joining State (when arriving via /room/:roomCode without saved session)
+  const [needsJoin, setNeedsJoin] = useState(false);
+  const [directUsername, setDirectUsername] = useState('');
+  const [directUsernameError, setDirectUsernameError] = useState<string | null>(null);
+  const [isDirectJoining, setIsDirectJoining] = useState(false);
+  const [directJoinError, setDirectJoinError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!roomCode) {
-      setError('Invalid room code');
+      setError('Invalid room code provided in URL');
       setLoading(false);
       return;
     }
 
     let isMounted = true;
 
-    // 1. Fetch initial safe room details via REST API
-    const loadRoom = async () => {
+    const checkAndInitRoom = async () => {
       try {
         setLoading(true);
         setError(null);
 
+        // Fetch room to verify existence
         const safeRoom = await roomApiService.getRoom(roomCode);
         if (!isMounted) return;
         setRoom(safeRoom);
 
-        // 2. Initialize Socket.IO connection
-        const socket = socketService.connect();
+        // Check if user has an existing session in sessionStorage for this room
+        const savedUsername = sessionStorage.getItem('watchparty_username');
+        const savedUserId = sessionStorage.getItem('watchparty_userId');
 
-        const handleConnect = () => {
-          if (!isMounted) return;
-          setSocketConnected(true);
-
-          const username = sessionStorage.getItem('watchparty_username') || 'Anonymous';
-          const userId = sessionStorage.getItem('watchparty_userId') || undefined;
-
-          // Join room over WebSocket
-          socketService.joinRoom({
-            roomCode: safeRoom.roomCode,
-            username,
-            userId,
-          });
-        };
-
-        const handleDisconnect = () => {
-          if (!isMounted) return;
-          setSocketConnected(false);
-        };
-
-        const handleSyncState = (data: SyncStatePayload) => {
-          if (!isMounted) return;
-          setRoom((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  playbackState: data.playState,
-                  playbackTime: data.currentTime,
-                  currentVideoId: data.videoId,
-                  participants: data.participants,
-                  participantCount: data.participants.length,
-                }
-              : prev
-          );
-        };
-
-        socket.on('connect', handleConnect);
-        socket.on('disconnect', handleDisconnect);
-        const unsubscribeSync = socketService.on(SOCKET_EVENTS.SYNC_STATE, handleSyncState);
-
-        if (socket.connected) {
-          handleConnect();
+        if (!savedUsername || !savedUserId) {
+          // User arrived directly via link without joining first
+          setNeedsJoin(true);
+          setLoading(false);
+          return;
         }
 
-        return () => {
-          socket.off('connect', handleConnect);
-          socket.off('disconnect', handleDisconnect);
-          unsubscribeSync();
-          socketService.leaveRoom({ roomCode: safeRoom.roomCode });
-          socketService.disconnect();
-        };
+        // User already has session credentials; connect socket
+        initSocket(safeRoom.roomCode, savedUsername, savedUserId);
       } catch (err: unknown) {
         if (!isMounted) return;
         if (err instanceof AppApiError) {
@@ -100,13 +76,102 @@ export const RoomPage: React.FC = () => {
       }
     };
 
-    loadRoom();
+    checkAndInitRoom();
 
     return () => {
       isMounted = false;
       socketService.disconnect();
     };
   }, [roomCode]);
+
+  const initSocket = (code: string, username: string, userId?: string) => {
+    const socket = socketService.connect();
+
+    const handleConnect = () => {
+      setSocketConnected(true);
+      socketService.joinRoom({
+        roomCode: code,
+        username,
+        userId,
+      });
+    };
+
+    const handleDisconnect = () => {
+      setSocketConnected(false);
+    };
+
+    const handleSyncState = (data: SyncStatePayload) => {
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              playbackState: data.playState,
+              playbackTime: data.currentTime,
+              currentVideoId: data.videoId,
+              participants: data.participants,
+              participantCount: data.participants.length,
+            }
+          : prev
+      );
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    const unsubscribeSync = socketService.on(SOCKET_EVENTS.SYNC_STATE, handleSyncState);
+
+    if (socket.connected) {
+      handleConnect();
+    }
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      unsubscribeSync();
+      socketService.leaveRoom({ roomCode: code });
+      socketService.disconnect();
+    };
+  };
+
+  // Handle direct join form submission
+  const handleDirectJoinSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setDirectJoinError(null);
+
+    const validation = validateUsername(directUsername);
+    if (!validation.isValid) {
+      setDirectUsernameError(validation.error || 'Invalid username');
+      return;
+    }
+    setDirectUsernameError(null);
+
+    if (!roomCode) return;
+
+    try {
+      setIsDirectJoining(true);
+      const result = await roomApiService.joinRoom(roomCode, {
+        username: directUsername.trim(),
+      });
+
+      // Save credentials in sessionStorage
+      sessionStorage.setItem('watchparty_userId', result.participant.userId);
+      sessionStorage.setItem('watchparty_username', result.participant.username);
+      sessionStorage.setItem('watchparty_role', result.participant.role);
+
+      setRoom(result.room);
+      setNeedsJoin(false);
+
+      // Connect socket
+      initSocket(result.room.roomCode, result.participant.username, result.participant.userId);
+    } catch (err: unknown) {
+      if (err instanceof AppApiError) {
+        setDirectJoinError(err.message);
+      } else {
+        setDirectJoinError('Failed to join room. Please try again.');
+      }
+    } finally {
+      setIsDirectJoining(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -121,13 +186,15 @@ export const RoomPage: React.FC = () => {
 
   if (error || !room) {
     return (
-      <div className="flex-1 flex items-center justify-center py-20">
-        <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-8 text-center">
-          <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4">
+      <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
+        <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4">
             <FiAlertTriangle className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Room Error</h2>
-          <p className="text-slate-400 text-sm mb-6">{error || 'Room could not be loaded.'}</p>
+          <h2 className="text-xl font-semibold text-white mb-2">Room Not Found</h2>
+          <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+            {error || 'This watch party room does not exist or may have expired.'}
+          </p>
           <Link
             to="/"
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors"
@@ -140,13 +207,104 @@ export const RoomPage: React.FC = () => {
     );
   }
 
+  // Direct Link Join Prompt: User arrived via /room/:roomCode without an active session
+  if (needsJoin) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-12 sm:py-20 px-4">
+        <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
+              <FiLogIn className="w-4 h-4" />
+            </div>
+            <h2 className="text-xl font-semibold text-white">Join Watch Party</h2>
+          </div>
+          <p className="text-slate-400 text-xs sm:text-sm mb-5 leading-relaxed">
+            You were invited to room <span className="font-mono text-white font-medium">{room.roomCode}</span>. Enter your username to enter the party.
+          </p>
+
+          {directJoinError && (
+            <div
+              role="alert"
+              className="mb-4 p-3 rounded-lg bg-red-950/60 border border-red-800/80 text-red-200 text-xs flex items-start gap-2.5"
+            >
+              <FiAlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+              <span>{directJoinError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleDirectJoinSubmit} noValidate aria-label="Join Room Link Form" className="space-y-4">
+            <div>
+              <label htmlFor="direct-username" className="block text-xs font-medium text-slate-300 mb-1.5">
+                Your Username <span className="text-red-400" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="direct-username"
+                name="username"
+                type="text"
+                required
+                autoComplete="nickname"
+                maxLength={50}
+                placeholder="e.g. Charlie"
+                value={directUsername}
+                onChange={(e) => {
+                  setDirectUsername(e.target.value);
+                  if (directUsernameError) setDirectUsernameError(null);
+                }}
+                aria-invalid={!!directUsernameError}
+                aria-describedby={directUsernameError ? 'direct-username-error' : undefined}
+                className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-850 ${
+                  directUsernameError
+                    ? 'border-red-500 focus:ring-red-500/50'
+                    : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500/30'
+                }`}
+              />
+              {directUsernameError && (
+                <p id="direct-username-error" className="mt-1 text-xs text-red-400">
+                  {directUsernameError}
+                </p>
+              )}
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2.5">
+              <button
+                type="submit"
+                disabled={isDirectJoining}
+                aria-busy={isDirectJoining}
+                className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500 shadow-sm"
+              >
+                {isDirectJoining ? (
+                  <>
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                    <span>Joining Party...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiLogIn className="w-4 h-4" />
+                    <span>Enter Watch Party</span>
+                  </>
+                )}
+              </button>
+
+              <Link
+                to="/"
+                className="w-full py-2 text-center text-xs text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                Cancel and return to home
+              </Link>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   const currentUserRole = sessionStorage.getItem('watchparty_role') || 'participant';
 
   return (
     <div className="flex-1 flex flex-col gap-6">
       {/* Room Header Banner */}
-      <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl px-5 py-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Link
             to="/"
             className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 transition-colors"
@@ -156,7 +314,7 @@ export const RoomPage: React.FC = () => {
           </Link>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-lg font-bold text-white tracking-wide font-mono">
+              <h1 className="text-base sm:text-lg font-bold text-white tracking-wide font-mono">
                 {room.roomCode}
               </h1>
               <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 uppercase">
@@ -164,7 +322,7 @@ export const RoomPage: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-              <span className="font-mono">Video: {room.currentVideoId}</span>
+              <span className="font-mono truncate max-w-[120px] sm:max-w-none">Video: {room.currentVideoId}</span>
               <span>•</span>
               <span
                 className={`inline-flex items-center gap-1 ${
