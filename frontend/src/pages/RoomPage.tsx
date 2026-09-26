@@ -7,23 +7,28 @@ import {
   FiLoader,
   FiAlertCircle,
   FiRefreshCw,
+  FiCheckCircle,
+  FiInfo,
 } from 'react-icons/fi';
 import { roomApiService, AppApiError } from '../services/api';
 import type { SafeRoomDto, Role } from '../types/room.types';
 import { validateUsername } from '../utils/roomCode';
+import { permissions } from '../utils/permissions';
 
 import { RoomHeader } from '../components/room/RoomHeader';
 import { YouTubePlayer, type YouTubePlayerHandle } from '../components/room/YouTubePlayer';
 import { PlaybackControls } from '../components/room/PlaybackControls';
 import { VideoUrlInput } from '../components/room/VideoUrlInput';
 import { ParticipantsPanel } from '../components/room/ParticipantsPanel';
+import { ParticipantRequestModal } from '../components/room/ParticipantRequestModal';
+import { PendingRequestsQueue } from '../components/room/PendingRequestsQueue';
 import { useWatchPartySocket } from '../hooks/useWatchPartySocket';
 
 export const RoomPage: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
 
-  // Imperative handle to control the YouTube player
+  // Imperative handle to control YouTube player
   const playerRef = useRef<YouTubePlayerHandle>(null);
 
   // Initial REST loading & session state
@@ -49,6 +54,9 @@ export const RoomPage: React.FC = () => {
   const [isDirectJoining, setIsDirectJoining] = useState(false);
   const [directJoinError, setDirectJoinError] = useState<string | null>(null);
 
+  // Participant Request Modal State
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+
   // Kicked Notification Modal
   const [removedNotice, setRemovedNotice] = useState<string | null>(null);
 
@@ -69,6 +77,8 @@ export const RoomPage: React.FC = () => {
     socketConnected,
     isReconnecting,
     socketError,
+    actionRequests,
+    notifications,
     actions,
   } = useWatchPartySocket({
     roomCode: roomCode || '',
@@ -81,7 +91,9 @@ export const RoomPage: React.FC = () => {
     onRemovedByHost: handleRemovedByHost,
   });
 
-  const isHostOrMod = currentRole === 'host' || currentRole === 'moderator';
+  const isHost = permissions.isHost(currentRole);
+  const isHostOrMod = permissions.canControlPlayback(currentRole);
+  const canApprove = permissions.canApproveRequests(currentRole);
 
   // Fetch initial room via REST API
   useEffect(() => {
@@ -106,7 +118,6 @@ export const RoomPage: React.FC = () => {
         const savedUserId = sessionStorage.getItem('watchparty_userId');
 
         if (!savedUsername || !savedUserId) {
-          // Direct room link join required
           setNeedsJoin(true);
           setLoading(false);
           return;
@@ -336,7 +347,33 @@ export const RoomPage: React.FC = () => {
   const activeRoom = room || initialRoom!;
 
   return (
-    <div className="flex-1 flex flex-col gap-5 sm:gap-6 w-full max-w-7xl mx-auto overflow-x-hidden">
+    <div className="flex-1 flex flex-col gap-5 sm:gap-6 w-full max-w-7xl mx-auto overflow-x-hidden relative">
+      {/* Toast Notifications for Action Requests & Statuses */}
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        {notifications.map((n) => (
+          <div
+            key={n.id}
+            role="status"
+            className={`pointer-events-auto p-3.5 rounded-xl border text-xs shadow-lg flex items-start gap-2.5 transition-all ${
+              n.type === 'success'
+                ? 'bg-slate-900/95 border-emerald-500/80 text-emerald-200'
+                : n.type === 'warning'
+                  ? 'bg-slate-900/95 border-amber-500/80 text-amber-200'
+                  : 'bg-slate-900/95 border-blue-500/80 text-blue-200'
+            }`}
+          >
+            {n.type === 'success' ? (
+              <FiCheckCircle className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+            ) : n.type === 'warning' ? (
+              <FiAlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+            ) : (
+              <FiInfo className="w-4 h-4 shrink-0 text-blue-400 mt-0.5" />
+            )}
+            <span className="flex-1 leading-snug">{n.message}</span>
+          </div>
+        ))}
+      </div>
+
       {/* 1. Room Header (Room code, Room link, Current user, Current role, Participant count) */}
       <RoomHeader
         roomCode={activeRoom.roomCode}
@@ -362,6 +399,16 @@ export const RoomPage: React.FC = () => {
         </div>
       )}
 
+      {/* Host & Moderator Pending Change Requests Queue */}
+      {canApprove && (
+        <PendingRequestsQueue
+          requests={actionRequests}
+          isHostOrMod={canApprove}
+          onApprove={actions.approveRequest}
+          onReject={actions.rejectRequest}
+        />
+      )}
+
       {/* 2. Main Watch Room Layout (Desktop: 2/3 Player + 1/3 Sidebar; Mobile: Stacked Video First) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 flex-1 items-start">
         {/* Main Column: YouTube Player + Controls + Video URL Input */}
@@ -385,6 +432,7 @@ export const RoomPage: React.FC = () => {
             onPlay={actions.play}
             onPause={actions.pause}
             onSeek={actions.seek}
+            onRequestControl={() => setIsRequestModalOpen(true)}
           />
 
           {/* C. Video URL / Input Area */}
@@ -392,17 +440,34 @@ export const RoomPage: React.FC = () => {
             currentVideoId={activeRoom.currentVideoId}
             isHostOrMod={isHostOrMod}
             onChangeVideo={actions.changeVideo}
+            onRequestChangeVideo={(vid) =>
+              actions.submitActionRequest('change_video', { videoId: vid })
+            }
           />
         </div>
 
-        {/* Sidebar Column: Participants Panel */}
+        {/* Sidebar Column: Participants Panel with Host Moderation Menu */}
         <div className="lg:col-span-1 w-full flex flex-col">
           <ParticipantsPanel
             participants={activeRoom.participants}
             currentUserId={currentUserId}
+            isHost={isHost}
+            onAssignRole={actions.assignRole}
+            onRemoveParticipant={actions.removeParticipant}
+            onTransferHost={actions.transferHost}
           />
         </div>
       </div>
+
+      {/* Participant Request Modal Dialog */}
+      <ParticipantRequestModal
+        isOpen={isRequestModalOpen}
+        onClose={() => setIsRequestModalOpen(false)}
+        currentTime={currentTime}
+        duration={duration}
+        currentVideoId={activeRoom.currentVideoId}
+        onSubmitRequest={actions.submitActionRequest}
+      />
     </div>
   );
 };

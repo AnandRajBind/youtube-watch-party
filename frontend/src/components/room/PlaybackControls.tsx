@@ -4,8 +4,8 @@ import {
   FiPause,
   FiRotateCcw,
   FiRotateCw,
-  FiLock,
   FiRadio,
+  FiSend,
 } from 'react-icons/fi';
 import { formatPlaybackTime } from '../../utils/youtube';
 
@@ -17,6 +17,7 @@ interface PlaybackControlsProps {
   onPlay: () => void;
   onPause: () => void;
   onSeek: (seconds: number) => void;
+  onRequestControl?: () => void;
 }
 
 export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
@@ -27,6 +28,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
   onPlay,
   onPause,
   onSeek,
+  onRequestControl,
 }) => {
   const handleTogglePlay = () => {
     if (!isHostOrMod) return;
@@ -94,7 +96,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             className={`p-2.5 rounded-lg flex items-center justify-center text-white transition-colors ${
               isHostOrMod
                 ? 'bg-red-600 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/50'
-                : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-75'
+                : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
             }`}
           >
             {playbackState === 'playing' ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4" />}
@@ -125,18 +127,22 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
           </button>
         </div>
 
-        {/* Permission / Viewer Status Notice */}
-        <div className="flex items-center gap-2 text-xs">
+        {/* Right side: Host status OR Participant "Request control" Button */}
+        <div className="flex items-center gap-2.5">
           {isHostOrMod ? (
-            <span className="inline-flex items-center gap-1.5 text-slate-400">
+            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>Direct Control Enabled</span>
+              <span>Direct Control</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-md border border-slate-700/60">
-              <FiLock className="w-3 h-3 text-amber-400" />
-              <span>Viewer Mode (Synced)</span>
-            </span>
+            <button
+              type="button"
+              onClick={onRequestControl}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <FiSend className="w-3 h-3" />
+              <span>Request control</span>
+            </button>
           )}
 
           <span className="hidden sm:inline-block text-slate-600">•</span>
