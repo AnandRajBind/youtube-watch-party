@@ -23,8 +23,9 @@ import type { YouTubePlayerHandle } from '../components/room/YouTubePlayer';
 
 export interface ActionNotification {
   id: string;
+  title?: string;
   message: string;
-  type: 'info' | 'success' | 'warning';
+  type: 'info' | 'success' | 'warning' | 'error';
 }
 
 interface UseWatchPartySocketProps {
@@ -66,17 +67,25 @@ export function useWatchPartySocket({
   const currentUserIdRef = useRef(userId);
   currentUserIdRef.current = userId;
 
-  const addNotification = useCallback((message: string, type: 'info' | 'success' | 'warning' = 'info') => {
-    const notif: ActionNotification = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      message,
-      type,
-    };
-    setNotifications((prev) => [...prev, notif]);
+  const addNotification = useCallback(
+    (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', title?: string) => {
+      const notif: ActionNotification = {
+        id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        title,
+        message,
+        type,
+      };
+      setNotifications((prev) => [...prev, notif]);
 
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
-    }, 4500);
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
+      }, 5000);
+    },
+    []
+  );
+
+  const removeNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
   // Sync initialRoom when loaded via REST API
@@ -106,8 +115,15 @@ export function useWatchPartySocket({
       });
     };
 
-    const handleDisconnect = (_reason: string) => {
+    const handleDisconnect = (reason: string) => {
       setSocketConnected(false);
+      if (reason !== 'io client disconnect') {
+        addNotification(
+          'Connection lost. Real-time synchronization is temporarily paused.',
+          'warning',
+          'Socket Disconnected'
+        );
+      }
     };
 
     const handleReconnectAttempt = () => {
@@ -117,6 +133,11 @@ export function useWatchPartySocket({
     const handleReconnect = () => {
       setIsReconnecting(false);
       setSocketConnected(true);
+      addNotification(
+        'Reconnected to Watch Party server! Playback sync restored.',
+        'success',
+        'Sync Restored'
+      );
 
       socketService.joinRoom({
         roomCode,
@@ -309,7 +330,11 @@ export function useWatchPartySocket({
 
       const myId = currentUserIdRef.current;
       if (data.requesterUserId === myId) {
-        addNotification(`Your ${data.action.toUpperCase()} request was sent to the Host/Moderator.`, 'info');
+        addNotification(
+          `Your ${data.action.toUpperCase()} request is pending review by the Host/Moderator.`,
+          'info',
+          'Request Pending'
+        );
       }
     };
 
@@ -318,7 +343,11 @@ export function useWatchPartySocket({
 
       const myId = currentUserIdRef.current;
       if (data.requesterUserId === myId) {
-        addNotification(`Your ${data.action.toUpperCase()} request was approved by ${data.approvedBy}!`, 'success');
+        addNotification(
+          `Your ${data.action.toUpperCase()} request was approved by ${data.approvedBy}! Video synchronized.`,
+          'success',
+          'Request Approved'
+        );
       }
     };
 
@@ -327,13 +356,24 @@ export function useWatchPartySocket({
 
       const myId = currentUserIdRef.current;
       if (data.requesterUserId === myId) {
-        const reason = data.reason ? ` (${data.reason})` : '';
-        addNotification(`Your ${data.action.toUpperCase()} request was rejected by ${data.rejectedBy}${reason}.`, 'warning');
+        const reason = data.reason ? `: ${data.reason}` : '';
+        addNotification(
+          `Your ${data.action.toUpperCase()} request was rejected by ${data.rejectedBy}${reason}.`,
+          'warning',
+          'Request Rejected'
+        );
       }
     };
 
     const handleSocketError = (data: SocketErrorPayload) => {
-      setSocketError(data.message || 'An error occurred during real-time sync.');
+      const isUnauthorized = data.code === 'UNAUTHORIZED' || data.code === 'FORBIDDEN';
+      const title = isUnauthorized ? 'Unauthorized Action' : 'Sync Error';
+      const message = isUnauthorized
+        ? (data.message || 'You do not have permission to control playback. Propose an action using "Request Control".')
+        : (data.message || 'An error occurred during real-time sync.');
+
+      addNotification(message, 'error', title);
+      setSocketError(message);
       setTimeout(() => setSocketError(null), 5000);
     };
 
@@ -499,6 +539,19 @@ export function useWatchPartySocket({
     socketService.disconnect();
   }, [roomCode]);
 
+  const hasPendingRequest = actionRequests.some(
+    (r) => r.requesterUserId === userId
+  );
+
+  const reconnect = useCallback(() => {
+    socketService.connect();
+    socketService.joinRoom({
+      roomCode,
+      username,
+      userId: currentUserIdRef.current || undefined,
+    });
+  }, [roomCode, username]);
+
   return {
     room,
     currentTime,
@@ -508,6 +561,8 @@ export function useWatchPartySocket({
     socketError,
     actionRequests,
     notifications,
+    hasPendingRequest,
+    removeNotification,
     actions: {
       play,
       pause,
@@ -523,6 +578,7 @@ export function useWatchPartySocket({
       removeParticipant,
       transferHost,
       leave,
+      reconnect,
     },
   };
 }

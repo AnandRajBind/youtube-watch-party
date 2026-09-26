@@ -14,6 +14,7 @@ interface PlaybackControlsProps {
   currentTime: number;
   duration: number;
   isHostOrMod: boolean;
+  hasPendingRequest?: boolean;
   onPlay: () => void;
   onPause: () => void;
   onSeek: (seconds: number) => void;
@@ -25,6 +26,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
   currentTime,
   duration,
   isHostOrMod,
+  hasPendingRequest = false,
   onPlay,
   onPause,
   onSeek,
@@ -138,10 +140,28 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             <button
               type="button"
               onClick={onRequestControl}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs focus:outline-none focus:ring-2 ${
+                hasPendingRequest
+                  ? 'bg-amber-600/25 hover:bg-amber-600/35 text-amber-300 border border-amber-500/40 focus:ring-amber-500/50'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white focus:ring-blue-500/50'
+              }`}
+              title={
+                hasPendingRequest
+                  ? 'You have a control request pending review'
+                  : 'Request control from the Host or Moderator'
+              }
             >
-              <FiSend className="w-3 h-3" />
-              <span>Request control</span>
+              {hasPendingRequest ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Request Pending...</span>
+                </>
+              ) : (
+                <>
+                  <FiSend className="w-3 h-3" />
+                  <span>Request control</span>
+                </>
+              )}
             </button>
           )}
 

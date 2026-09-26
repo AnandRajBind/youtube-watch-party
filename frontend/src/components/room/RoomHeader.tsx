@@ -10,6 +10,7 @@ import {
   FiUser,
   FiRadio,
   FiUsers,
+  FiRefreshCw,
 } from 'react-icons/fi';
 import type { Role } from '../../types/room.types';
 import { copyToClipboard, getRoomShareUrl } from '../../utils/clipboard';
@@ -21,6 +22,8 @@ interface RoomHeaderProps {
   currentRole: Role;
   participantCount: number;
   socketConnected: boolean;
+  isReconnecting?: boolean;
+  onReconnect?: () => void;
   onOpenParticipants?: () => void;
 }
 
@@ -30,6 +33,8 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   currentRole,
   participantCount,
   socketConnected,
+  isReconnecting = false,
+  onReconnect,
   onOpenParticipants,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
@@ -199,16 +204,31 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
 
           <span className="text-slate-600">•</span>
 
-          <span
-            className={`inline-flex items-center gap-1.5 font-medium ${
-              socketConnected ? 'text-emerald-400' : 'text-amber-400'
-            }`}
-          >
-            <FiRadio className={`w-3.5 h-3.5 ${socketConnected ? 'animate-pulse' : ''}`} />
-            <span className="hidden sm:inline">
-              {socketConnected ? 'Real-Time Sync Active' : 'Connecting...'}
+          {socketConnected ? (
+            <span className="inline-flex items-center gap-1.5 font-medium text-emerald-400">
+              <FiRadio className="w-3.5 h-3.5 animate-pulse" />
+              <span className="hidden sm:inline">Sync Active</span>
             </span>
-          </span>
+          ) : isReconnecting ? (
+            <span className="inline-flex items-center gap-1.5 font-medium text-amber-400">
+              <FiRefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span className="hidden sm:inline">Reconnecting...</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 font-medium text-rose-400">
+              <FiRadio className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Disconnected</span>
+              {onReconnect && (
+                <button
+                  type="button"
+                  onClick={onReconnect}
+                  className="underline hover:text-rose-300 ml-0.5 text-xs font-semibold focus:outline-none"
+                >
+                  (Retry)
+                </button>
+              )}
+            </span>
+          )}
         </div>
       </div>
 

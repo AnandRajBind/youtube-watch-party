@@ -7,9 +7,11 @@ import {
   FiLoader,
   FiAlertCircle,
   FiRefreshCw,
-  FiCheckCircle,
-  FiInfo,
   FiUsers,
+  FiSearch,
+  FiWifiOff,
+  FiUserX,
+  FiPlus,
 } from 'react-icons/fi';
 import { roomApiService, AppApiError } from '../services/api';
 import type { SafeRoomDto, Role } from '../types/room.types';
@@ -23,6 +25,7 @@ import { VideoUrlInput } from '../components/room/VideoUrlInput';
 import { ParticipantsPanel } from '../components/room/ParticipantsPanel';
 import { ParticipantRequestModal } from '../components/room/ParticipantRequestModal';
 import { PendingRequestsQueue } from '../components/room/PendingRequestsQueue';
+import { NotificationToast } from '../components/common/NotificationToast';
 import { useWatchPartySocket } from '../hooks/useWatchPartySocket';
 
 export const RoomPage: React.FC = () => {
@@ -36,6 +39,7 @@ export const RoomPage: React.FC = () => {
   const [initialRoom, setInitialRoom] = useState<SafeRoomDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   // Current User Session
   const [currentUsername, setCurrentUsername] = useState(
@@ -80,9 +84,10 @@ export const RoomPage: React.FC = () => {
     duration,
     socketConnected,
     isReconnecting,
-    socketError,
     actionRequests,
     notifications,
+    hasPendingRequest,
+    removeNotification,
     actions,
   } = useWatchPartySocket({
     roomCode: roomCode || '',
@@ -152,7 +157,7 @@ export const RoomPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [roomCode]);
+  }, [roomCode, retryTrigger]);
 
   // Handle direct join form submission
   const handleDirectJoinSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -196,59 +201,131 @@ export const RoomPage: React.FC = () => {
     }
   };
 
-  // Loading View
+  // 1. Loading View (Skeleton Loading State)
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center py-20">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-400 text-sm">Connecting to watch party...</span>
+      <div className="flex-1 flex flex-col gap-6 max-w-7xl w-full mx-auto animate-pulse">
+        {/* Header Skeleton */}
+        <div className="h-20 bg-slate-800/60 rounded-xl border border-slate-700/60 flex items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-slate-700" />
+            <div className="w-28 h-5 rounded bg-slate-700" />
+          </div>
+          <div className="flex gap-2">
+            <div className="w-20 h-8 rounded-lg bg-slate-700" />
+            <div className="w-24 h-8 rounded-lg bg-slate-700" />
+          </div>
+        </div>
+
+        {/* Main Content Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            <div className="aspect-video bg-slate-800/60 rounded-xl border border-slate-700/60 flex flex-col items-center justify-center gap-3">
+              <FiLoader className="w-8 h-8 text-red-500 animate-spin" />
+              <span className="text-xs text-slate-400">Loading watch party room...</span>
+            </div>
+            <div className="h-16 bg-slate-800/60 rounded-xl border border-slate-700/60" />
+            <div className="h-12 bg-slate-800/60 rounded-xl border border-slate-700/60" />
+          </div>
+          <div className="hidden lg:block lg:col-span-1 h-96 bg-slate-800/60 rounded-xl border border-slate-700/60" />
         </div>
       </div>
     );
   }
 
-  // Error View
+  // 2. Room Not Found & API Error Views
   if (error || (!room && !initialRoom)) {
+    const isNotFound =
+      (error && (
+        error.toLowerCase().includes('not found') ||
+        error.toLowerCase().includes('does not exist') ||
+        error.toLowerCase().includes('invalid room')
+      )) || false;
+
+    if (isNotFound) {
+      return (
+        <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
+          <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-lg">
+            <div className="w-14 h-14 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto mb-4">
+              <FiSearch className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Room Not Found</h2>
+            <p className="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed">
+              We couldn't find a watch party room with code <span className="font-mono text-white font-semibold">{roomCode}</span>. It may have expired or the link is incorrect.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-medium transition-colors"
+              >
+                <FiPlus className="w-4 h-4" />
+                <span>Create Watch Party</span>
+              </Link>
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs sm:text-sm font-medium transition-colors"
+              >
+                <FiArrowLeft className="w-4 h-4" />
+                <span>Return to Home</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // General API / Network Connection Error View
     return (
       <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
-        <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-sm">
-          <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4">
-            <FiAlertTriangle className="w-6 h-6" />
+        <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-lg">
+          <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto mb-4">
+            <FiAlertTriangle className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Room Error</h2>
-          <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
-            {error || 'This watch party room does not exist or may have expired.'}
+          <h2 className="text-xl font-bold text-white mb-2">Connection Error</h2>
+          <p className="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed">
+            {error || 'Unable to connect to the watch party server. Please check your connection and try again.'}
           </p>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors"
-          >
-            <FiArrowLeft className="w-4 h-4" />
-            <span>Return to Home</span>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+            <button
+              type="button"
+              onClick={() => setRetryTrigger((prev) => prev + 1)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+            >
+              <FiRefreshCw className="w-4 h-4" />
+              <span>Try Again</span>
+            </button>
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs sm:text-sm font-medium transition-colors"
+            >
+              <FiArrowLeft className="w-4 h-4" />
+              <span>Return to Home</span>
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Kicked Notification Modal
+  // 3. Participant Removed Screen
   if (removedNotice) {
     return (
       <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
-        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-lg">
-          <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4">
-            <FiAlertCircle className="w-6 h-6" />
+        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-xl">
+          <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto mb-4">
+            <FiUserX className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Removed from Room</h2>
-          <p className="text-slate-300 text-sm mb-6 leading-relaxed">{removedNotice}</p>
+          <h2 className="text-xl font-bold text-white mb-2">Removed from Watch Party</h2>
+          <p className="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed bg-slate-900/60 p-3.5 rounded-lg border border-slate-700/80">
+            {removedNotice}
+          </p>
           <button
             type="button"
             onClick={() => {
               sessionStorage.clear();
               navigate('/');
             }}
-            className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+            className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
           >
             Back to Home
           </button>
@@ -352,31 +429,11 @@ export const RoomPage: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col gap-5 sm:gap-6 w-full max-w-7xl mx-auto overflow-x-hidden relative">
-      {/* Toast Notifications for Action Requests & Statuses */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-        {notifications.map((n) => (
-          <div
-            key={n.id}
-            role="status"
-            className={`pointer-events-auto p-3.5 rounded-xl border text-xs shadow-lg flex items-start gap-2.5 transition-all ${
-              n.type === 'success'
-                ? 'bg-slate-900/95 border-emerald-500/80 text-emerald-200'
-                : n.type === 'warning'
-                  ? 'bg-slate-900/95 border-amber-500/80 text-amber-200'
-                  : 'bg-slate-900/95 border-blue-500/80 text-blue-200'
-            }`}
-          >
-            {n.type === 'success' ? (
-              <FiCheckCircle className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
-            ) : n.type === 'warning' ? (
-              <FiAlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-            ) : (
-              <FiInfo className="w-4 h-4 shrink-0 text-blue-400 mt-0.5" />
-            )}
-            <span className="flex-1 leading-snug">{n.message}</span>
-          </div>
-        ))}
-      </div>
+      {/* Unified Toast Notifications System */}
+      <NotificationToast
+        notifications={notifications}
+        onDismiss={removeNotification}
+      />
 
       {/* 1. Room Header (Room code, Room link, Current user, Current role, Participant count) */}
       <RoomHeader
@@ -385,22 +442,41 @@ export const RoomPage: React.FC = () => {
         currentRole={currentRole}
         participantCount={activeRoom.participants.length}
         socketConnected={socketConnected}
+        isReconnecting={isReconnecting}
+        onReconnect={actions.reconnect}
         onOpenParticipants={() => setIsMobileParticipantsOpen(true)}
       />
 
-      {/* Reconnecting Alert Banner */}
+      {/* Socket Connection Status Banners */}
       {isReconnecting && (
-        <div role="status" className="p-3 rounded-lg bg-amber-950/70 border border-amber-800 text-amber-200 text-xs flex items-center gap-2">
-          <FiRefreshCw className="w-4 h-4 shrink-0 text-amber-400 animate-spin" />
-          <span>Reconnecting to Watch Party server...</span>
+        <div
+          role="status"
+          className="p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-200 text-xs flex items-center justify-between shadow-xs"
+        >
+          <div className="flex items-center gap-2">
+            <FiRefreshCw className="w-4 h-4 shrink-0 text-amber-400 animate-spin" />
+            <span>Reconnecting to Watch Party server...</span>
+          </div>
+          <span className="text-[11px] text-amber-400/90 font-mono">Auto-syncing</span>
         </div>
       )}
 
-      {/* Socket Error Toast/Banner */}
-      {socketError && (
-        <div role="alert" className="p-3 rounded-lg bg-red-950/70 border border-red-800 text-red-200 text-xs flex items-center gap-2">
-          <FiAlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-          <span>{socketError}</span>
+      {!socketConnected && !isReconnecting && (
+        <div
+          role="alert"
+          className="p-3 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-200 text-xs flex items-center justify-between shadow-xs"
+        >
+          <div className="flex items-center gap-2">
+            <FiWifiOff className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>Disconnected from server. Real-time playback synchronization is paused.</span>
+          </div>
+          <button
+            type="button"
+            onClick={actions.reconnect}
+            className="px-2.5 py-1 rounded-md bg-rose-800 hover:bg-rose-700 text-white font-medium text-xs transition-colors shrink-0 cursor-pointer"
+          >
+            Reconnect Now
+          </button>
         </div>
       )}
 
@@ -434,6 +510,7 @@ export const RoomPage: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             isHostOrMod={isHostOrMod}
+            hasPendingRequest={hasPendingRequest}
             onPlay={actions.play}
             onPause={actions.pause}
             onSeek={actions.seek}

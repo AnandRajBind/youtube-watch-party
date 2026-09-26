@@ -205,9 +205,23 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
               }
             },
             onError: (event: { data: number }) => {
-              setLoadError(
-                `YouTube Player Error (${event.data}). The video may be private, age-restricted, or embedding is disabled.`
-              );
+              let errorMsg = `Playback Error (${event.data}): Unable to play this video.`;
+              switch (event.data) {
+                case 2:
+                  errorMsg = 'Invalid Video ID: The video ID parameter contains invalid characters or format.';
+                  break;
+                case 5:
+                  errorMsg = 'HTML5 Player Error: The requested content cannot be played in an HTML5 player.';
+                  break;
+                case 100:
+                  errorMsg = 'Video Not Found: This video does not exist, or has been removed or set to private.';
+                  break;
+                case 101:
+                case 150:
+                  errorMsg = 'Embedding Restricted: The video owner does not allow playback in embedded third-party players.';
+                  break;
+              }
+              setLoadError(errorMsg);
             },
           },
         });
@@ -386,9 +400,16 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
         {/* Error Overlay */}
         {loadError && (
           <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-30">
-            <FiAlertCircle className="w-8 h-8 text-rose-400 mb-2" />
-            <p className="text-sm font-medium text-white mb-1">Playback Error</p>
-            <p className="text-xs text-slate-400 max-w-md">{loadError}</p>
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mb-3">
+              <FiAlertCircle className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-semibold text-white mb-1.5">Video Unavailable</p>
+            <p className="text-xs text-slate-300 max-w-md leading-relaxed mb-3">{loadError}</p>
+            <span className="text-[11px] text-slate-500">
+              {isHostOrMod
+                ? 'Use the "Change Video" input below to enter a different YouTube link.'
+                : 'Waiting for the Host or Moderator to select a different video.'}
+            </span>
           </div>
         )}
       </div>

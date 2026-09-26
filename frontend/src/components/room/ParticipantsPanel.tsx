@@ -185,7 +185,15 @@ export const ParticipantsPanel: React.FC<ParticipantsPanelProps> = ({
       {/* Participant List */}
       <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1 overscroll-contain">
         {participants.length === 0 ? (
-          <p className="text-xs text-slate-500 py-6 text-center">No participants in this room.</p>
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+            <div className="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mb-2.5">
+              <FiUsers className="w-5 h-5" />
+            </div>
+            <p className="text-xs font-semibold text-slate-300 mb-1">No Participants</p>
+            <p className="text-[11px] text-slate-500 max-w-xs">
+              This room currently has no connected participants.
+            </p>
+          </div>
         ) : (
           participants.map((p) => {
             const isMe = p.userId === currentUserId;
@@ -296,6 +304,15 @@ export const ParticipantsPanel: React.FC<ParticipantsPanelProps> = ({
               </div>
             );
           })
+        )}
+
+        {participants.length === 1 && participants[0].userId === currentUserId && (
+          <div className="mt-2 p-3 rounded-lg bg-slate-900/60 border border-slate-800 text-center flex flex-col items-center gap-1">
+            <span className="text-xs font-semibold text-slate-300">Watching Solo?</span>
+            <p className="text-[11px] text-slate-400 leading-snug">
+              Share the room code or invite link to watch videos with friends in real time.
+            </p>
+          </div>
         )}
       </div>
     </div>
