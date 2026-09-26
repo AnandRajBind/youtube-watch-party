@@ -1,13 +1,15 @@
 import { Server as HttpServer } from 'http';
-import { Server as SocketIOServer, Socket } from 'socket.io';
+import { Server as SocketIOServer } from 'socket.io';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { registerRoomHandlers } from './handlers/roomHandler';
-import { registerSyncHandlers } from './handlers/syncHandler';
-import { registerRoleHandlers } from './handlers/roleHandler';
+import { CustomSocket } from './socketTypes';
 
 let io: SocketIOServer | null = null;
 
+/**
+ * Initializes and attaches the Socket.IO server to the HTTP server.
+ */
 export function initSocketServer(httpServer: HttpServer): SocketIOServer {
   io = new SocketIOServer(httpServer, {
     cors: {
@@ -20,23 +22,27 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
     pingTimeout: 20000,
   });
 
-  logger.info(`Socket.IO initialized with CORS allowed origin: ${env.CLIENT_URL}`);
+  logger.info(`Socket.IO Server initialized with CORS origin: ${env.CLIENT_URL}`);
 
-  io.on('connection', (socket: Socket) => {
-    logger.info(`Client connected via Socket.IO: [id=${socket.id}]`);
+  io.on('connection', (socket: CustomSocket) => {
+    logger.info(`New socket connection established: [id=${socket.id}]`);
 
-    // Register all modular event handlers
+    // Register room membership and session handlers
     registerRoomHandlers(io!, socket);
-    registerSyncHandlers(io!, socket);
-    registerRoleHandlers(io!, socket);
   });
 
   return io;
 }
 
+/**
+ * Returns the active Socket.IO server instance.
+ */
 export function getIO(): SocketIOServer {
   if (!io) {
     throw new Error('Socket.IO has not been initialized. Call initSocketServer first.');
   }
   return io;
 }
+
+export * from './socketTypes';
+export * from './roomSocket';

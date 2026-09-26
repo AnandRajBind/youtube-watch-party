@@ -12,7 +12,7 @@ import { ApiError } from '../utils/apiError';
 import { generateRoomCode } from '../utils/roomCode';
 import { extractYouTubeVideoId } from '../utils/youtube';
 import { syncService } from './syncService';
-import { connectionManager } from '../sockets/connectionManager';
+import { isUserOnlineInRoom } from '../sockets/roomSocket';
 
 export class RoomService {
   /**
@@ -25,7 +25,7 @@ export class RoomService {
       username: p.username,
       role: p.role,
       joinedAt: p.joinedAt,
-      isOnline: connectionManager.isUserOnline(p.userId, room.roomCode),
+      isOnline: isUserOnlineInRoom(room.roomCode, p.userId),
     }));
 
     return {
@@ -199,7 +199,7 @@ export class RoomService {
       username: participant.username,
       role: participant.role,
       joinedAt: participant.joinedAt,
-      isOnline: connectionManager.isUserOnline(participant.userId, code),
+      isOnline: isUserOnlineInRoom(code, participant.userId),
     };
 
     return {
