@@ -9,6 +9,7 @@ import {
   FiRefreshCw,
   FiCheckCircle,
   FiInfo,
+  FiUsers,
 } from 'react-icons/fi';
 import { roomApiService, AppApiError } from '../services/api';
 import type { SafeRoomDto, Role } from '../types/room.types';
@@ -53,6 +54,9 @@ export const RoomPage: React.FC = () => {
   const [directUsernameError, setDirectUsernameError] = useState<string | null>(null);
   const [isDirectJoining, setIsDirectJoining] = useState(false);
   const [directJoinError, setDirectJoinError] = useState<string | null>(null);
+
+  // Mobile Participants Drawer State
+  const [isMobileParticipantsOpen, setIsMobileParticipantsOpen] = useState(false);
 
   // Participant Request Modal State
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -381,6 +385,7 @@ export const RoomPage: React.FC = () => {
         currentRole={currentRole}
         participantCount={activeRoom.participants.length}
         socketConnected={socketConnected}
+        onOpenParticipants={() => setIsMobileParticipantsOpen(true)}
       />
 
       {/* Reconnecting Alert Banner */}
@@ -444,10 +449,39 @@ export const RoomPage: React.FC = () => {
               actions.submitActionRequest('change_video', { videoId: vid })
             }
           />
+
+          {/* D. Mobile Participants Trigger Banner */}
+          <div className="lg:hidden bg-slate-800/80 border border-slate-700 rounded-xl p-3.5 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-slate-700/60 flex items-center justify-center shrink-0">
+                <FiUsers className="w-4 h-4 text-blue-400" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-white">Participants</h3>
+                  <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                    {activeRoom.participants.length}
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{activeRoom.participants.filter((p) => p.isOnline).length} online</span>
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileParticipantsOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              View Panel
+            </button>
+          </div>
         </div>
 
-        {/* Sidebar Column: Participants Panel with Host Moderation Menu */}
-        <div className="lg:col-span-1 w-full flex flex-col">
+        {/* Sidebar Column: Participants Panel on Desktop */}
+        <div className="hidden lg:flex lg:col-span-1 w-full flex-col">
           <ParticipantsPanel
             participants={activeRoom.participants}
             currentUserId={currentUserId}
@@ -458,6 +492,19 @@ export const RoomPage: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Mobile Drawer (Slide-over sheet on small screens) */}
+      <ParticipantsPanel
+        isDrawer={true}
+        isOpen={isMobileParticipantsOpen}
+        onClose={() => setIsMobileParticipantsOpen(false)}
+        participants={activeRoom.participants}
+        currentUserId={currentUserId}
+        isHost={isHost}
+        onAssignRole={actions.assignRole}
+        onRemoveParticipant={actions.removeParticipant}
+        onTransferHost={actions.transferHost}
+      />
 
       {/* Participant Request Modal Dialog */}
       <ParticipantRequestModal

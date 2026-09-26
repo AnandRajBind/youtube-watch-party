@@ -9,6 +9,7 @@ import {
   FiShield,
   FiUser,
   FiRadio,
+  FiUsers,
 } from 'react-icons/fi';
 import type { Role } from '../../types/room.types';
 
@@ -18,6 +19,7 @@ interface RoomHeaderProps {
   currentRole: Role;
   participantCount: number;
   socketConnected: boolean;
+  onOpenParticipants?: () => void;
 }
 
 export const RoomHeader: React.FC<RoomHeaderProps> = ({
@@ -26,6 +28,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   currentRole,
   participantCount,
   socketConnected,
+  onOpenParticipants,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -103,8 +106,22 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right Actions: Copy Code & Copy Link Buttons */}
+        {/* Right Actions: Copy Code, Copy Link, and Mobile Participants Button */}
         <div className="flex items-center gap-2">
+          {/* Mobile Participants Drawer Trigger */}
+          {onOpenParticipants && (
+            <button
+              type="button"
+              onClick={onOpenParticipants}
+              className="lg:hidden px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-medium transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="View Participants"
+              aria-label="View Participants"
+            >
+              <FiUsers className="w-3.5 h-3.5 text-blue-400" />
+              <span>{participantCount}</span>
+            </button>
+          )}
+
           {/* Copy Code */}
           <button
             type="button"
@@ -144,7 +161,23 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
 
         {/* Sync Status & Participant Count */}
         <div className="flex items-center gap-3">
-          <span className="text-slate-400 font-mono">
+          {onOpenParticipants ? (
+            <button
+              type="button"
+              onClick={onOpenParticipants}
+              className="lg:hidden text-slate-300 hover:text-white font-mono flex items-center gap-1.5 transition-colors focus:outline-none focus:underline"
+              title="Open participants panel"
+            >
+              <FiUsers className="w-3.5 h-3.5 text-blue-400" />
+              <span>{participantCount} {participantCount === 1 ? 'member' : 'members'}</span>
+            </button>
+          ) : (
+            <span className="lg:hidden text-slate-400 font-mono">
+              {participantCount} {participantCount === 1 ? 'member' : 'members'}
+            </span>
+          )}
+
+          <span className="hidden lg:inline text-slate-400 font-mono">
             {participantCount} {participantCount === 1 ? 'member' : 'members'}
           </span>
 
