@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io';
-import { PlaybackState, Role, SafeParticipantDto, SafeRoomDto } from '../types/room.types';
+import { PlaybackState, Role, SafeParticipantDto } from '../types/room.types';
 
 // Standard Socket.IO Event Names
 export const SOCKET_EVENTS = {
@@ -19,13 +19,15 @@ export type SocketEventType = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];
 
 // Client -> Server Event Payloads
 export interface JoinRoomPayload {
-  roomCode: string;
-  userId: string;
-  username?: string;
+  roomId?: string;
+  roomCode?: string;
+  username: string;
+  userId?: string;
 }
 
 export interface LeaveRoomPayload {
-  roomCode: string;
+  roomId?: string;
+  roomCode?: string;
 }
 
 // Runtime Memory Representation of a Connected Participant
@@ -50,15 +52,30 @@ export interface SocketSessionData {
 export type CustomSocket = Socket<any, any, any, { session?: SocketSessionData }>;
 
 // Server -> Client Payloads
+export interface SyncStatePayload {
+  playState: PlaybackState;
+  currentTime: number;
+  videoId: string;
+  roomCode: string;
+  roomId: string;
+  userRole: Role;
+  serverTimestamp: number;
+  participants: SafeParticipantDto[];
+}
+
 export interface UserJoinedPayload {
   user: SafeParticipantDto;
   participantCount: number;
+  roomCode: string;
+  roomId: string;
 }
 
 export interface UserLeftPayload {
   userId: string;
   username: string;
   participantCount: number;
+  roomCode: string;
+  roomId: string;
 }
 
 export interface ParticipantUpdatePayload {

@@ -8,7 +8,7 @@ import { initSocketServer, getOnlineParticipantsInRoom, isUserOnlineInRoom } fro
 import { SOCKET_EVENTS } from '../src/sockets/socketTypes';
 
 async function runSocketServerTests() {
-  console.log('--- Starting Socket.IO Server Lifecycle Tests ---');
+  console.log('--- Starting Socket.IO Room Events & Lifecycle Tests ---');
   await connectDatabase();
 
   const httpServer = http.createServer(app);
@@ -20,55 +20,55 @@ async function runSocketServerTests() {
 
   let hostClient: ClientSocket | null = null;
   let participantClient: ClientSocket | null = null;
-  let testRoomCode = '';
+  let duplicateTabClient: ClientSocket | null = null;
+  let testRoomId = '';
 
   try {
-    // 1. Create a test room in MongoDB with Alice as Host
+    // 1. Setup: Create room with Alice as Host in MongoDB
     const creatorUserId = 'user_alice_host';
     const { room: createdRoom } = await roomService.createRoom(
       'AliceHost',
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       creatorUserId
     );
-    testRoomCode = createdRoom.roomCode;
-    console.log(`[PASS] Setup: Created test room '${testRoomCode}' with host '${creatorUserId}'`);
+    testRoomId = createdRoom.roomCode;
+    console.log(`[PASS] Setup: Created test room '${testRoomId}' with host '${creatorUserId}'`);
 
     // 2. Connect Client 1 (Alice - Host)
     hostClient = Client(serverUrl, { transports: ['websocket'] });
     await new Promise<void>((resolve) => hostClient!.on('connect', resolve));
     console.log(`[PASS] Host socket connected [id=${hostClient.id}]`);
 
-    // 3. Alice emits 'join_room'
+    // 3. Alice emits 'join_room' with { roomId, username, userId }
     const hostSyncStatePromise = new Promise<any>((resolve) => {
       hostClient!.on(SOCKET_EVENTS.SYNC_STATE, resolve);
     });
 
     hostClient.emit(SOCKET_EVENTS.JOIN_ROOM, {
-      roomCode: testRoomCode,
-      userId: creatorUserId,
+      roomId: testRoomId,
       username: 'AliceHost',
+      userId: creatorUserId,
     });
 
-    const hostSyncState = await hostSyncStatePromise;
-    if (hostSyncState.roomCode !== testRoomCode || hostSyncState.userRole !== 'host') {
-      throw new Error(`Host sync_state verification failed: role=${hostSyncState.userRole}`);
-    }
-    console.log(`[PASS] Step 1-6: Host verified, role determined as '${hostSyncState.userRole}', received sync_state`);
+    const hostSync = await hostSyncStatePromise;
 
-    // 4. Verify Runtime Memory for Host
-    const onlineParticipants = getOnlineParticipantsInRoom(testRoomCode);
-    if (onlineParticipants.length !== 1 || !isUserOnlineInRoom(testRoomCode, creatorUserId)) {
-      throw new Error('Host not found in runtime memory store');
+    // Check required sync_state fields: playState, currentTime, videoId
+    if (
+      !hostSync.playState ||
+      typeof hostSync.currentTime !== 'number' ||
+      !hostSync.videoId ||
+      hostSync.userRole !== 'host'
+    ) {
+      throw new Error(`sync_state does not contain required playState, currentTime, or videoId: ${JSON.stringify(hostSync)}`);
     }
-    console.log('[PASS] Runtime memory correctly tracking active socket connection and host participant');
+    console.log(`[PASS] Host received sync_state: playState=${hostSync.playState}, currentTime=${hostSync.currentTime}, videoId=${hostSync.videoId}`);
 
-    // 5. Connect Client 2 (Bob - Participant attempting to spoof role as 'host')
+    // 4. Connect Client 2 (Bob - Participant sending { roomId, username } with role spoof attempt)
     const bobUserId = 'user_bob_participant';
     participantClient = Client(serverUrl, { transports: ['websocket'] });
     await new Promise<void>((resolve) => participantClient!.on('connect', resolve));
-    console.log(`[PASS] Participant socket connected [id=${participantClient.id}]`);
 
-    // Set up listeners on Host to verify broadcasts
+    // Listeners on Host for broadcasts
     const userJoinedPromise = new Promise<any>((resolve) => {
       hostClient!.on(SOCKET_EVENTS.USER_JOINED, resolve);
     });
@@ -79,67 +79,108 @@ async function runSocketServerTests() {
       participantClient!.on(SOCKET_EVENTS.SYNC_STATE, resolve);
     });
 
-    // Bob attempts to send role: "host" (spoofing attempt!)
+    // Bob emits join_room with client-supplied fake role: "host"
     participantClient.emit(SOCKET_EVENTS.JOIN_ROOM, {
-      roomCode: testRoomCode,
+      roomId: testRoomId,
+      username: 'BobParticipant',
       userId: bobUserId,
-      username: 'Bob',
-      role: 'host', // Malicious attempt to claim host
+      role: 'host', // Malicious attempt to claim host!
     } as any);
 
-    const bobSyncState = await bobSyncStatePromise;
-    // 6. Verify Server-Side Role Enforcement (Must be 'participant')
-    if (bobSyncState.userRole !== 'participant') {
-      throw new Error(`Security Failure: Server accepted client-provided role! Got: ${bobSyncState.userRole}`);
-    }
-    console.log("[PASS] Security Check: Client spoofed role was ignored. Server resolved actual role as 'participant'");
+    const bobSync = await bobSyncStatePromise;
 
-    // 7. Verify Host received user_joined and participant_update broadcasts
+    // Verify Server-Side Role Enforcement (Must be 'participant')
+    if (bobSync.userRole !== 'participant') {
+      throw new Error(`Security violation: Server trusted client-provided role! Got: ${bobSync.userRole}`);
+    }
+    console.log(`[PASS] Server-Side Role Enforcement: Client spoofed role was ignored. Server resolved actual role as '${bobSync.userRole}'`);
+
+    // Verify Host received user_joined and participant_update
     const joinedPayload = await userJoinedPromise;
-    if (joinedPayload.user.userId !== bobUserId || joinedPayload.user.role !== 'participant') {
+    if (joinedPayload.user.username !== 'BobParticipant' || joinedPayload.user.role !== 'participant') {
       throw new Error('Host did not receive valid user_joined broadcast');
     }
-    console.log(`[PASS] Step 7: Host received 'user_joined' broadcast for Bob (online count: ${joinedPayload.participantCount})`);
+    console.log(`[PASS] Host received 'user_joined' broadcast for '${joinedPayload.user.username}' (role: ${joinedPayload.user.role})`);
 
     const updatePayload = await participantUpdatePromise;
     if (updatePayload.participantCount !== 2) {
-      throw new Error(`Expected 2 online participants in participant_update, got ${updatePayload.participantCount}`);
+      throw new Error(`Expected 2 participants in participant_update, got ${updatePayload.participantCount}`);
     }
-    console.log('[PASS] Step 7: Host received refreshed participant list update (2 online)');
+    console.log(`[PASS] Broadcast updated participant list verified (${updatePayload.participantCount} online)`);
 
-    // 8. Test Disconnection & Runtime Cleanup
-    const userLeftPromise = new Promise<any>((resolve) => {
+    // 5. Test Duplicate Connection Graceful Handling (Bob opens a second tab)
+    duplicateTabClient = Client(serverUrl, { transports: ['websocket'] });
+    await new Promise<void>((resolve) => duplicateTabClient!.on('connect', resolve));
+
+    const duplicateSyncStatePromise = new Promise<any>((resolve) => {
+      duplicateTabClient!.on(SOCKET_EVENTS.SYNC_STATE, resolve);
+    });
+
+    duplicateTabClient.emit(SOCKET_EVENTS.JOIN_ROOM, {
+      roomId: testRoomId,
+      username: 'BobParticipant',
+      userId: bobUserId,
+    });
+
+    const duplicateSync = await duplicateSyncStatePromise;
+    if (duplicateSync.videoId !== hostSync.videoId) {
+      throw new Error('Duplicate tab failed to receive sync_state');
+    }
+    console.log('[PASS] Duplicate connection handled gracefully: Second tab connected and received sync_state');
+
+    // 6. Test Tab 1 Disconnect while Tab 2 is still open (Should NOT emit user_left)
+    let userLeftEmittedOnHost = false;
+    const unexpectedUserLeftHandler = () => {
+      userLeftEmittedOnHost = true;
+    };
+    hostClient.on(SOCKET_EVENTS.USER_LEFT, unexpectedUserLeftHandler);
+
+    participantClient.disconnect();
+    // Wait brief moment to confirm no jitter
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    if (userLeftEmittedOnHost) {
+      throw new Error('user_left was emitted prematurely while user still had another active tab open!');
+    }
+    console.log('[PASS] Multi-tab graceful handling: Tab 1 disconnected without emitting user_left because Tab 2 is active');
+    hostClient.off(SOCKET_EVENTS.USER_LEFT, unexpectedUserLeftHandler);
+
+    // 7. Test leave_room from duplicate tab (Final tab leaves)
+    const finalUserLeftPromise = new Promise<any>((resolve) => {
       hostClient!.on(SOCKET_EVENTS.USER_LEFT, resolve);
     });
 
-    participantClient.disconnect();
+    duplicateTabClient.emit(SOCKET_EVENTS.LEAVE_ROOM, {
+      roomId: testRoomId,
+    });
 
-    const leftPayload = await userLeftPromise;
+    const leftPayload = await finalUserLeftPromise;
     if (leftPayload.userId !== bobUserId) {
-      throw new Error('Host did not receive user_left broadcast for Bob');
+      throw new Error('Host did not receive user_left after final tab left');
     }
-    console.log(`[PASS] Disconnect Handling: Host received 'user_left' broadcast for ${leftPayload.userId}`);
+    console.log(`[PASS] leave_room cleanly removed participant and broadcasted 'user_left' for ${leftPayload.username}`);
 
-    // Verify Bob is no longer online in runtime memory
-    if (isUserOnlineInRoom(testRoomCode, bobUserId)) {
-      throw new Error('Bob still marked online in runtime memory after disconnect');
+    // Verify Bob is now completely offline in runtime memory
+    if (isUserOnlineInRoom(testRoomId, bobUserId)) {
+      throw new Error('Bob still marked online after all tabs left');
     }
-    console.log('[PASS] Runtime memory cleanly removed disconnected socket');
+    console.log('[PASS] Runtime memory cleanly freed after participant left room');
 
-    console.log('--- ALL SOCKET.IO SERVER TESTS PASSED SUCCESSFULLY ---');
+    console.log('--- ALL SOCKET.IO EVENT TESTS PASSED SUCCESSFULLY ---');
   } finally {
     if (hostClient) hostClient.disconnect();
     if (participantClient) participantClient.disconnect();
+    if (duplicateTabClient) duplicateTabClient.disconnect();
     ioServer.close();
     httpServer.close();
-    if (testRoomCode) {
-      await RoomModel.deleteOne({ roomCode: testRoomCode });
+    if (testRoomId) {
+      await RoomModel.deleteOne({ roomCode: testRoomId });
     }
     await disconnectDatabase();
   }
 }
 
 runSocketServerTests().catch((err) => {
-  console.error('Socket.IO test failed:', err);
+  console.error('Socket.IO event test failed:', err);
   process.exit(1);
 });

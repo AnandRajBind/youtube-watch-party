@@ -175,7 +175,11 @@ export async function broadcastRoomState(io: SocketIOServer, roomCode: string): 
   const room = await getRoom(code);
 
   io.to(code).emit(SOCKET_EVENTS.SYNC_STATE, {
+    playState: room.playbackState,
+    currentTime: room.playbackTime,
+    videoId: room.currentVideoId,
     roomCode: room.roomCode,
+    roomId: room.roomCode,
     currentVideoId: room.currentVideoId,
     playbackState: room.playbackState,
     playbackTime: room.playbackTime,

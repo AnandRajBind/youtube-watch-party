@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Server as SocketIOServer } from 'socket.io';
 import {
   addRuntimeParticipant,
@@ -21,50 +22,76 @@ import { logger } from '../../utils/logger';
 
 export function registerRoomHandlers(io: SocketIOServer, socket: CustomSocket): void {
   /**
-   * Handle socket joining a watch party room.
+   * Event: join_room
    *
-   * Flow:
-   * 1. Validate payload/session input
-   * 2. Verify room exists in persistent storage (MongoDB)
-   * 3. Verify / register persistent participant
-   * 4. Determine actual role strictly from server-side data
-   * 5. Join Socket.IO room & track in runtime memory
-   * 6. Send current room state to joining socket
-   * 7. Broadcast participant update to room
+   * Payload: { roomId (or roomCode), username, userId? }
+   *
+   * 8-step server-authoritative join process:
+   * 1. Validate room
+   * 2. Validate participant/session
+   * 3. Determine actual participant identity
+   * 4. Determine role from server-side state (Never trust client-provided role!)
+   * 5. Join Socket.IO room & track runtime connection (handle duplicates gracefully)
+   * 6. Send sync_state { playState, currentTime, videoId, ... } to joining client
+   * 7. Broadcast user_joined to other clients in room
+   * 8. Broadcast updated participant list to room
    */
   socket.on(SOCKET_EVENTS.JOIN_ROOM, async (payload: JoinRoomPayload) => {
     try {
-      // 1. Validate session / input data
       if (!payload || typeof payload !== 'object') {
         socket.emit(SOCKET_EVENTS.ERROR, {
           code: 'INVALID_PAYLOAD',
-          message: 'Malformed request payload',
+          message: 'Request payload must be an object',
         });
         return;
       }
 
-      const roomCode = payload.roomCode?.trim().toUpperCase();
-      const userId = payload.userId?.trim();
-      const rawUsername = payload.username?.trim();
+      // 1. Validate Room
+      const rawRoomId = payload.roomId || payload.roomCode;
+      const roomId = rawRoomId?.trim().toUpperCase();
 
-      if (!roomCode || !userId) {
+      if (!roomId) {
         socket.emit(SOCKET_EVENTS.ERROR, {
-          code: 'MISSING_CREDENTIALS',
-          message: 'Both roomCode and userId are required to join room',
+          code: 'MISSING_ROOM_ID',
+          message: 'roomId is required to join room',
         });
         return;
       }
 
-      // 2. Verify room exists in MongoDB
-      const room = await getRoom(roomCode);
+      // Verify room exists in persistent storage (MongoDB)
+      const room = await getRoom(roomId);
 
-      // 3. Verify participant in persistent storage (or register if new)
-      let persistentParticipant = await getParticipant(roomCode, userId);
-      const username = rawUsername || persistentParticipant?.username || 'Guest';
+      // 2. Validate Participant / Session
+      const rawUsername = payload.username?.trim();
+      const sanitizedUsername = rawUsername ? rawUsername.replace(/<[^>]*>?/gm, '') : '';
 
+      if (!sanitizedUsername || sanitizedUsername.length < 2) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'INVALID_USERNAME',
+          message: 'Username must be at least 2 characters long',
+        });
+        return;
+      }
+
+      // 3. Determine actual participant identity
+      // Look for userId from socket handshake auth, payload, or generate new identity
+      const handshakeUserId = (socket.handshake.auth?.userId as string)?.trim();
+      const payloadUserId = payload.userId?.trim();
+      const clientUserId = handshakeUserId || payloadUserId;
+
+      let persistentParticipant = clientUserId
+        ? await getParticipant(roomId, clientUserId)
+        : null;
+
+      let userId = persistentParticipant ? persistentParticipant.userId : clientUserId;
+
+      if (!userId) {
+        userId = crypto.randomUUID();
+      }
+
+      // If participant not yet in persistent room record, persist them
       if (!persistentParticipant) {
-        // Register in persistent MongoDB room
-        const joinResult = await roomService.joinRoom(roomCode, userId, username);
+        const joinResult = await roomService.joinRoom(roomId, userId, sanitizedUsername);
         persistentParticipant = {
           userId: joinResult.participant.userId,
           username: joinResult.participant.username,
@@ -73,94 +100,119 @@ export function registerRoomHandlers(io: SocketIOServer, socket: CustomSocket): 
         };
       }
 
-      // 4. Determine actual role from server-side data (Never trust client-provided role!)
-      const resolvedRole = await checkRole(roomCode, userId);
+      const finalUsername = sanitizedUsername || persistentParticipant.username;
 
-      // 5. Join Socket.IO room channel & store in runtime memory
-      await socket.join(roomCode);
+      // 4. Determine role from server-side state
+      // CRITICAL: NEVER trust any role sent by client
+      const resolvedRole = await checkRole(roomId, userId);
 
-      const runtimeParticipant = {
+      // 5. Join Socket.IO room & handle duplicate connections gracefully
+      // Clean up any previous room this socket was in
+      if (socket.data.session && socket.data.session.roomCode !== roomId) {
+        await socket.leave(socket.data.session.roomCode);
+        removeRuntimeParticipant(socket.id);
+      }
+
+      const isAlreadyConnectedInRoom = isUserOnlineInRoom(roomId, userId);
+
+      // Add socket connection to in-memory runtime store
+      addRuntimeParticipant({
         socketId: socket.id,
         userId,
-        username,
+        username: finalUsername,
         role: resolvedRole,
-        roomCode,
+        roomCode: roomId,
         connectedAt: new Date(),
-      };
-
-      addRuntimeParticipant(runtimeParticipant);
-
-      // Attach verified session data to socket instance for fast subsequent lookups
-      socket.data.session = {
-        userId,
-        username,
-        role: resolvedRole,
-        roomCode,
-      };
-
-      logger.info(
-        `Socket connected to room: [room=${roomCode}, user=${username}, role=${resolvedRole}, socketId=${socket.id}]`
-      );
-
-      // 6. Send current authoritative room state directly to the joining socket
-      socket.emit(SOCKET_EVENTS.SYNC_STATE, {
-        roomCode: room.roomCode,
-        currentVideoId: room.currentVideoId,
-        playbackState: room.playbackState,
-        playbackTime: room.playbackTime,
-        serverTimestamp: Date.now(),
-        userRole: resolvedRole,
-        participants: room.participants,
-        participantCount: getOnlineParticipantsInRoom(roomCode).length,
       });
 
-      // 7. Broadcast participant update to other members of the room
+      // Cache session on socket instance
+      socket.data.session = {
+        userId,
+        username: finalUsername,
+        role: resolvedRole,
+        roomCode: roomId,
+      };
+
+      await socket.join(roomId);
+
+      logger.info(
+        `Participant joined room: [roomId=${roomId}, user=${finalUsername}, role=${resolvedRole}, socketId=${socket.id}, duplicateTab=${isAlreadyConnectedInRoom}]`
+      );
+
+      // 6. Send sync_state directly to the joining client
+      // Exact requested structure: { playState, currentTime, videoId, ... }
+      socket.emit(SOCKET_EVENTS.SYNC_STATE, {
+        playState: room.playbackState,
+        currentTime: room.playbackTime,
+        videoId: room.currentVideoId,
+        roomCode: room.roomCode,
+        roomId: room.roomCode,
+        userRole: resolvedRole,
+        serverTimestamp: Date.now(),
+        participants: room.participants,
+      });
+
+      // 7. Broadcast user_joined to other clients (only if first connection for this user)
       const safeUserDto: SafeParticipantDto = {
         userId,
-        username,
+        username: finalUsername,
         role: resolvedRole,
         joinedAt: persistentParticipant.joinedAt,
         isOnline: true,
       };
 
-      socket.to(roomCode).emit(SOCKET_EVENTS.USER_JOINED, {
-        user: safeUserDto,
-        participantCount: getOnlineParticipantsInRoom(roomCode).length,
-      });
+      if (!isAlreadyConnectedInRoom) {
+        socket.to(roomId).emit(SOCKET_EVENTS.USER_JOINED, {
+          user: safeUserDto,
+          participantCount: getOnlineParticipantsInRoom(roomId).length,
+          roomCode: roomId,
+          roomId,
+        });
+      }
 
-      // Broadcast full refreshed participant list to room
-      await broadcastParticipants(io, roomCode);
+      // 8. Broadcast updated participant list to all room members
+      await broadcastParticipants(io, roomId);
     } catch (err: any) {
       logger.error('Error in join_room socket handler:', err);
       socket.emit(SOCKET_EVENTS.ERROR, {
         code: err.errorCode || 'JOIN_ROOM_FAILED',
-        message: err.message || 'Failed to join watch party room',
+        message: err.message || 'Failed to join room',
       });
     }
   });
 
   /**
-   * Handle socket leaving a room explicitly
+   * Event: leave_room
+   *
+   * 1. Remove participant from active room runtime memory
+   * 2. Broadcast user_left
+   * 3. Clean runtime socket state
+   * 4. Leave Socket.IO room
    */
   socket.on(SOCKET_EVENTS.LEAVE_ROOM, async (payload: LeaveRoomPayload) => {
     try {
-      const roomCode = payload?.roomCode?.trim().toUpperCase() || socket.data.session?.roomCode;
-      if (!roomCode) return;
+      const rawRoomId = payload?.roomId || payload?.roomCode || socket.data.session?.roomCode;
+      const roomId = rawRoomId?.trim().toUpperCase();
+
+      if (!roomId) return;
 
       const removed = removeRuntimeParticipant(socket.id);
-      await socket.leave(roomCode);
+      await socket.leave(roomId);
       delete socket.data.session;
 
       if (removed) {
-        const stillOnline = isUserOnlineInRoom(roomCode, removed.userId);
+        // Only broadcast user_left if user has no remaining active connections in this room
+        const stillOnline = isUserOnlineInRoom(roomId, removed.userId);
         if (!stillOnline) {
-          io.to(roomCode).emit(SOCKET_EVENTS.USER_LEFT, {
+          io.to(roomId).emit(SOCKET_EVENTS.USER_LEFT, {
             userId: removed.userId,
             username: removed.username,
-            participantCount: getOnlineParticipantsInRoom(roomCode).length,
+            participantCount: getOnlineParticipantsInRoom(roomId).length,
+            roomCode: roomId,
+            roomId,
           });
         }
-        await broadcastParticipants(io, roomCode);
+        await broadcastParticipants(io, roomId);
       }
     } catch (err) {
       logger.error('Error in leave_room socket handler:', err);
@@ -168,7 +220,34 @@ export function registerRoomHandlers(io: SocketIOServer, socket: CustomSocket): 
   });
 
   /**
-   * Handle socket disconnection (network drop, tab close, navigation)
+   * Event: sync_state (Client manual refresh / state query)
+   */
+  socket.on(SOCKET_EVENTS.SYNC_STATE, async () => {
+    try {
+      const session = socket.data.session;
+      if (!session) return;
+
+      const room = await getRoom(session.roomCode);
+      socket.emit(SOCKET_EVENTS.SYNC_STATE, {
+        playState: room.playbackState,
+        currentTime: room.playbackTime,
+        videoId: room.currentVideoId,
+        roomCode: room.roomCode,
+        roomId: room.roomCode,
+        userRole: session.role,
+        serverTimestamp: Date.now(),
+        participants: room.participants,
+      });
+    } catch (err) {
+      logger.error('Error in sync_state request handler:', err);
+    }
+  });
+
+  /**
+   * Event: disconnect
+   *
+   * Cleans runtime socket state safely.
+   * If user has no remaining open connections (tabs), broadcasts user_left.
    */
   socket.on('disconnect', async (reason: string) => {
     try {
@@ -177,16 +256,18 @@ export function registerRoomHandlers(io: SocketIOServer, socket: CustomSocket): 
 
       const { roomCode, userId, username } = removed;
       logger.info(
-        `Socket disconnected: [room=${roomCode}, user=${username}, socketId=${socket.id}, reason=${reason}]`
+        `Socket disconnected: [roomId=${roomCode}, user=${username}, socketId=${socket.id}, reason=${reason}]`
       );
 
-      // Check if user has no remaining open connections (e.g. closed all tabs)
+      // Check if user has other open connections (e.g. multiple tabs)
       const stillOnline = isUserOnlineInRoom(roomCode, userId);
       if (!stillOnline) {
         io.to(roomCode).emit(SOCKET_EVENTS.USER_LEFT, {
           userId,
           username,
           participantCount: getOnlineParticipantsInRoom(roomCode).length,
+          roomCode,
+          roomId: roomCode,
         });
       }
 
