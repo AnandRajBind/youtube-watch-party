@@ -1,29 +1,58 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   FiArrowLeft,
-  FiUsers,
-  FiVideo,
-  FiShield,
   FiAlertTriangle,
-  FiAlertCircle,
   FiLogIn,
   FiLoader,
+  FiAlertCircle,
 } from 'react-icons/fi';
 import { roomApiService, AppApiError } from '../services/api';
 import { socketService } from '../socket/socket';
-import type { SafeRoomDto } from '../types/room.types';
-import type { SyncStatePayload } from '../types/socket.types';
+import type { SafeRoomDto, Role } from '../types/room.types';
+import type {
+  SyncStatePayload,
+  PlaybackBroadcastPayload,
+  SeekBroadcastPayload,
+  ChangeVideoBroadcastPayload,
+  ParticipantUpdatePayload,
+  RoleAssignedBroadcastPayload,
+  ParticipantRemovedBroadcastPayload,
+  SocketErrorPayload,
+} from '../types/socket.types';
 import { SOCKET_EVENTS } from '../types/socket.types';
 import { validateUsername } from '../utils/roomCode';
+
+import { RoomHeader } from '../components/room/RoomHeader';
+import { YouTubePlayer } from '../components/room/YouTubePlayer';
+import { PlaybackControls } from '../components/room/PlaybackControls';
+import { VideoUrlInput } from '../components/room/VideoUrlInput';
+import { ParticipantsPanel } from '../components/room/ParticipantsPanel';
 
 export const RoomPage: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
 
+  // Room & State
   const [room, setRoom] = useState<SafeRoomDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [socketError, setSocketError] = useState<string | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
+
+  // Playhead & Duration
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  // Current User Session
+  const [currentUsername, setCurrentUsername] = useState(
+    () => sessionStorage.getItem('watchparty_username') || ''
+  );
+  const [currentUserId, setCurrentUserId] = useState(
+    () => sessionStorage.getItem('watchparty_userId') || ''
+  );
+  const [currentRole, setCurrentRole] = useState<Role>(
+    () => (sessionStorage.getItem('watchparty_role') as Role) || 'participant'
+  );
 
   // Direct Link Joining State (when arriving via /room/:roomCode without saved session)
   const [needsJoin, setNeedsJoin] = useState(false);
@@ -32,6 +61,142 @@ export const RoomPage: React.FC = () => {
   const [isDirectJoining, setIsDirectJoining] = useState(false);
   const [directJoinError, setDirectJoinError] = useState<string | null>(null);
 
+  const isHostOrMod = currentRole === 'host' || currentRole === 'moderator';
+
+  // Socket setup
+  const initSocketListeners = useCallback(
+    (code: string, username: string, userId?: string) => {
+      const socket = socketService.connect();
+
+      const handleConnect = () => {
+        setSocketConnected(true);
+        socketService.joinRoom({
+          roomCode: code,
+          username,
+          userId,
+        });
+      };
+
+      const handleDisconnect = () => {
+        setSocketConnected(false);
+      };
+
+      const handleSyncState = (data: SyncStatePayload) => {
+        setRoom((prev) =>
+          prev
+            ? {
+                ...prev,
+                playbackState: data.playState,
+                playbackTime: data.currentTime,
+                currentVideoId: data.videoId,
+                participants: data.participants,
+                participantCount: data.participants.length,
+              }
+            : prev
+        );
+        setCurrentTime(data.currentTime);
+        if (data.userRole) {
+          setCurrentRole(data.userRole);
+          sessionStorage.setItem('watchparty_role', data.userRole);
+        }
+      };
+
+      const handlePlay = (data: PlaybackBroadcastPayload) => {
+        setRoom((prev) => (prev ? { ...prev, playbackState: 'playing', playbackTime: data.currentTime } : prev));
+        setCurrentTime(data.currentTime);
+      };
+
+      const handlePause = (data: PlaybackBroadcastPayload) => {
+        setRoom((prev) => (prev ? { ...prev, playbackState: 'paused', playbackTime: data.currentTime } : prev));
+        setCurrentTime(data.currentTime);
+      };
+
+      const handleSeek = (data: SeekBroadcastPayload) => {
+        setRoom((prev) => (prev ? { ...prev, playbackTime: data.currentTime } : prev));
+        setCurrentTime(data.currentTime);
+      };
+
+      const handleChangeVideo = (data: ChangeVideoBroadcastPayload) => {
+        setRoom((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentVideoId: data.videoId,
+                playbackState: data.playState,
+                playbackTime: data.currentTime,
+              }
+            : prev
+        );
+        setCurrentTime(data.currentTime);
+      };
+
+      const handleParticipantUpdate = (data: ParticipantUpdatePayload) => {
+        setRoom((prev) =>
+          prev
+            ? {
+                ...prev,
+                participants: data.participants,
+                participantCount: data.participantCount,
+              }
+            : prev
+        );
+      };
+
+      const handleRoleAssigned = (data: RoleAssignedBroadcastPayload) => {
+        const myId = sessionStorage.getItem('watchparty_userId');
+        if (data.targetUserId === myId || data.userId === myId) {
+          const newRole = data.newRole || data.role;
+          setCurrentRole(newRole);
+          sessionStorage.setItem('watchparty_role', newRole);
+        }
+      };
+
+      const handleParticipantRemoved = (data: ParticipantRemovedBroadcastPayload) => {
+        const myId = sessionStorage.getItem('watchparty_userId');
+        if (data.targetUserId === myId) {
+          setError(data.reason || 'You were removed from this room by the Host.');
+          socketService.disconnect();
+        }
+      };
+
+      const handleSocketError = (data: SocketErrorPayload) => {
+        setSocketError(data.message || 'An error occurred during real-time sync.');
+        setTimeout(() => setSocketError(null), 5000);
+      };
+
+      socket.on('connect', handleConnect);
+      socket.on('disconnect', handleDisconnect);
+
+      const unsubs = [
+        socketService.on(SOCKET_EVENTS.SYNC_STATE, handleSyncState),
+        socketService.on(SOCKET_EVENTS.PLAY, handlePlay),
+        socketService.on(SOCKET_EVENTS.PAUSE, handlePause),
+        socketService.on(SOCKET_EVENTS.SEEK, handleSeek),
+        socketService.on(SOCKET_EVENTS.CHANGE_VIDEO, handleChangeVideo),
+        socketService.on(SOCKET_EVENTS.PARTICIPANT_UPDATE, handleParticipantUpdate),
+        socketService.on(SOCKET_EVENTS.ROLE_ASSIGNED, handleRoleAssigned),
+        socketService.on(SOCKET_EVENTS.PARTICIPANT_REMOVED, handleParticipantRemoved),
+        socketService.on(SOCKET_EVENTS.ERROR, handleSocketError),
+      ];
+
+      if (socket.connected) {
+        handleConnect();
+      }
+
+      return () => {
+        socket.off('connect', handleConnect);
+        socket.off('disconnect', handleDisconnect);
+        unsubs.forEach((unsub) => unsub());
+        socketService.leaveRoom({ roomCode: code });
+        socketService.disconnect();
+      };
+    },
+    []
+  );
+
+  const cleanupSocketRef = useRef<(() => void) | null>(null);
+
+  // Initial Room Loading
   useEffect(() => {
     if (!roomCode) {
       setError('Invalid room code provided in URL');
@@ -50,20 +215,30 @@ export const RoomPage: React.FC = () => {
         const safeRoom = await roomApiService.getRoom(roomCode);
         if (!isMounted) return;
         setRoom(safeRoom);
+        setCurrentTime(safeRoom.playbackTime);
 
-        // Check if user has an existing session in sessionStorage for this room
+        // Check if user has an existing session in sessionStorage
         const savedUsername = sessionStorage.getItem('watchparty_username');
         const savedUserId = sessionStorage.getItem('watchparty_userId');
 
         if (!savedUsername || !savedUserId) {
-          // User arrived directly via link without joining first
+          // Direct room link join required
           setNeedsJoin(true);
           setLoading(false);
           return;
         }
 
-        // User already has session credentials; connect socket
-        initSocket(safeRoom.roomCode, savedUsername, savedUserId);
+        setCurrentUsername(savedUsername);
+        setCurrentUserId(savedUserId);
+
+        const myParticipant = safeRoom.participants.find((p) => p.userId === savedUserId);
+        if (myParticipant) {
+          setCurrentRole(myParticipant.role);
+          sessionStorage.setItem('watchparty_role', myParticipant.role);
+        }
+
+        // Initialize WebSocket connection
+        cleanupSocketRef.current = initSocketListeners(safeRoom.roomCode, savedUsername, savedUserId);
       } catch (err: unknown) {
         if (!isMounted) return;
         if (err instanceof AppApiError) {
@@ -80,57 +255,11 @@ export const RoomPage: React.FC = () => {
 
     return () => {
       isMounted = false;
-      socketService.disconnect();
+      if (cleanupSocketRef.current) {
+        cleanupSocketRef.current();
+      }
     };
-  }, [roomCode]);
-
-  const initSocket = (code: string, username: string, userId?: string) => {
-    const socket = socketService.connect();
-
-    const handleConnect = () => {
-      setSocketConnected(true);
-      socketService.joinRoom({
-        roomCode: code,
-        username,
-        userId,
-      });
-    };
-
-    const handleDisconnect = () => {
-      setSocketConnected(false);
-    };
-
-    const handleSyncState = (data: SyncStatePayload) => {
-      setRoom((prev) =>
-        prev
-          ? {
-              ...prev,
-              playbackState: data.playState,
-              playbackTime: data.currentTime,
-              currentVideoId: data.videoId,
-              participants: data.participants,
-              participantCount: data.participants.length,
-            }
-          : prev
-      );
-    };
-
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    const unsubscribeSync = socketService.on(SOCKET_EVENTS.SYNC_STATE, handleSyncState);
-
-    if (socket.connected) {
-      handleConnect();
-    }
-
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-      unsubscribeSync();
-      socketService.leaveRoom({ roomCode: code });
-      socketService.disconnect();
-    };
-  };
+  }, [roomCode, initSocketListeners]);
 
   // Handle direct join form submission
   const handleDirectJoinSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -157,11 +286,20 @@ export const RoomPage: React.FC = () => {
       sessionStorage.setItem('watchparty_username', result.participant.username);
       sessionStorage.setItem('watchparty_role', result.participant.role);
 
+      setCurrentUserId(result.participant.userId);
+      setCurrentUsername(result.participant.username);
+      setCurrentRole(result.participant.role);
+
       setRoom(result.room);
+      setCurrentTime(result.room.playbackTime);
       setNeedsJoin(false);
 
       // Connect socket
-      initSocket(result.room.roomCode, result.participant.username, result.participant.userId);
+      cleanupSocketRef.current = initSocketListeners(
+        result.room.roomCode,
+        result.participant.username,
+        result.participant.userId
+      );
     } catch (err: unknown) {
       if (err instanceof AppApiError) {
         setDirectJoinError(err.message);
@@ -173,6 +311,39 @@ export const RoomPage: React.FC = () => {
     }
   };
 
+  // Playback Control Handlers
+  const handlePlay = () => {
+    if (!isHostOrMod) return;
+    setRoom((prev) => (prev ? { ...prev, playbackState: 'playing' } : prev));
+    socketService.play({ currentTime });
+  };
+
+  const handlePause = () => {
+    if (!isHostOrMod) return;
+    setRoom((prev) => (prev ? { ...prev, playbackState: 'paused' } : prev));
+    socketService.pause({ currentTime });
+  };
+
+  const handleSeek = (newTime: number) => {
+    if (!isHostOrMod) return;
+    setCurrentTime(newTime);
+    setRoom((prev) => (prev ? { ...prev, playbackTime: newTime } : prev));
+    socketService.seek({ time: newTime });
+  };
+
+  const handleChangeVideo = (videoId: string) => {
+    if (!isHostOrMod) return;
+    socketService.changeVideo({ videoId });
+  };
+
+  const handleTimeUpdate = (time: number, totalDuration: number) => {
+    setCurrentTime(time);
+    if (totalDuration > 0 && totalDuration !== duration) {
+      setDuration(totalDuration);
+    }
+  };
+
+  // Loading View
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-20">
@@ -184,6 +355,7 @@ export const RoomPage: React.FC = () => {
     );
   }
 
+  // Error View
   if (error || !room) {
     return (
       <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
@@ -191,7 +363,7 @@ export const RoomPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4">
             <FiAlertTriangle className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Room Not Found</h2>
+          <h2 className="text-xl font-semibold text-white mb-2">Room Error</h2>
           <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
             {error || 'This watch party room does not exist or may have expired.'}
           </p>
@@ -298,111 +470,63 @@ export const RoomPage: React.FC = () => {
     );
   }
 
-  const currentUserRole = sessionStorage.getItem('watchparty_role') || 'participant';
-
   return (
-    <div className="flex-1 flex flex-col gap-6">
-      {/* Room Header Banner */}
-      <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <Link
-            to="/"
-            className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 transition-colors"
-            title="Leave Room"
-          >
-            <FiArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-base sm:text-lg font-bold text-white tracking-wide font-mono">
-                {room.roomCode}
-              </h1>
-              <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 uppercase">
-                {room.playbackState}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-              <span className="font-mono truncate max-w-[120px] sm:max-w-none">Video: {room.currentVideoId}</span>
-              <span>•</span>
-              <span
-                className={`inline-flex items-center gap-1 ${
-                  socketConnected ? 'text-emerald-400' : 'text-amber-400'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                {socketConnected ? 'Real-Time Sync Active' : 'Connecting WebSocket...'}
-              </span>
-            </p>
-          </div>
+    <div className="flex-1 flex flex-col gap-5 sm:gap-6 w-full max-w-7xl mx-auto overflow-x-hidden">
+      {/* 1. Room Header (Room code, Room link, Current user, Current role, Participant count) */}
+      <RoomHeader
+        roomCode={room.roomCode}
+        currentUser={currentUsername}
+        currentRole={currentRole}
+        participantCount={room.participants.length}
+        socketConnected={socketConnected}
+      />
+
+      {/* Socket Error Toast/Banner */}
+      {socketError && (
+        <div role="alert" className="p-3 rounded-lg bg-red-950/70 border border-red-800 text-red-200 text-xs flex items-center gap-2">
+          <FiAlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+          <span>{socketError}</span>
+        </div>
+      )}
+
+      {/* 2. Main Watch Room Layout (Desktop: 2/3 Player + 1/3 Sidebar; Mobile: Stacked Video First) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 flex-1 items-start">
+        {/* Main Column: YouTube Player + Controls + Video URL Input */}
+        <div className="lg:col-span-2 flex flex-col gap-4 w-full">
+          {/* A. YouTube Player (Video First on Mobile) */}
+          <YouTubePlayer
+            videoId={room.currentVideoId}
+            playbackState={room.playbackState}
+            playbackTime={currentTime}
+            isHostOrMod={isHostOrMod}
+            onTimeUpdate={handleTimeUpdate}
+          />
+
+          {/* B. Playback Controls */}
+          <PlaybackControls
+            playbackState={room.playbackState}
+            currentTime={currentTime}
+            duration={duration}
+            isHostOrMod={isHostOrMod}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onSeek={handleSeek}
+          />
+
+          {/* C. Video URL / Input Area */}
+          <VideoUrlInput
+            currentVideoId={room.currentVideoId}
+            isHostOrMod={isHostOrMod}
+            onChangeVideo={handleChangeVideo}
+          />
         </div>
 
-        {/* Current User Role Badge */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/50 border border-slate-600/50 text-xs text-slate-200">
-            <FiShield className="w-3.5 h-3.5 text-amber-400" />
-            <span className="capitalize">{currentUserRole}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Player Shell + Participant Shell */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-        {/* Left: YouTube Player Container Shell (2 cols) */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          <div className="w-full aspect-video bg-slate-950 border border-slate-800 rounded-xl flex flex-col items-center justify-center p-6 text-center shadow-lg relative overflow-hidden">
-            <div className="w-14 h-14 rounded-full bg-red-600/20 text-red-500 flex items-center justify-center mb-3">
-              <FiVideo className="w-7 h-7" />
-            </div>
-            <h3 className="text-base font-medium text-white mb-1">
-              Synchronized Video Player Shell
-            </h3>
-            <p className="text-xs text-slate-400 max-w-sm">
-              YouTube IFrame API integration will be mounted here in the next step with server-authoritative sync.
-            </p>
-            <div className="mt-4 px-3 py-1 rounded bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400">
-              Current Playhead Anchor: {room.playbackTime.toFixed(1)}s
-            </div>
-          </div>
-
-          {/* Playback Controls Placeholder */}
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between text-xs text-slate-400">
-            <span>Playback Controls Shell</span>
-            <span className="font-mono text-slate-500">Host / Moderator Authorized</span>
-          </div>
-        </div>
-
-        {/* Right: Participant List Shell (1 col) */}
-        <div className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-5 flex flex-col">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/60">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <FiUsers className="w-4 h-4 text-slate-400" />
-              <span>Participants</span>
-            </div>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-mono">
-              {room.participants.length}
-            </span>
-          </div>
-
-          <div className="space-y-2 flex-1 overflow-y-auto max-h-96">
-            {room.participants.map((p) => (
-              <div
-                key={p.userId}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      p.isOnline ? 'bg-emerald-400' : 'bg-slate-500'
-                    }`}
-                  />
-                  <span className="font-medium text-white">{p.username}</span>
-                </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-slate-800 text-slate-400">
-                  {p.role}
-                </span>
-              </div>
-            ))}
-          </div>
+        {/* Sidebar Column: Participants Panel (Stacked below on mobile without breaking layout) */}
+        <div className="lg:col-span-1 w-full flex flex-col">
+          <ParticipantsPanel
+            participants={room.participants}
+            currentUserId={currentUserId}
+          />
         </div>
       </div>
     </div>
