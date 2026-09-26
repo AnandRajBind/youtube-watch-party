@@ -3,6 +3,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { registerRoomHandlers } from './handlers/roomHandler';
+import { registerSyncHandlers } from './handlers/syncHandler';
 import { CustomSocket } from './socketTypes';
 
 let io: SocketIOServer | null = null;
@@ -29,6 +30,9 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
 
     // Register room membership and session handlers
     registerRoomHandlers(io!, socket);
+
+    // Register server-side playback synchronization handlers
+    registerSyncHandlers(io!, socket);
   });
 
   return io;

@@ -7,6 +7,10 @@ export const SOCKET_EVENTS = {
   JOIN_ROOM: 'join_room',
   LEAVE_ROOM: 'leave_room',
   SYNC_STATE: 'sync_state',
+  PLAY: 'play',
+  PAUSE: 'pause',
+  SEEK: 'seek',
+  CHANGE_VIDEO: 'change_video',
 
   // Server to Client
   USER_JOINED: 'user_joined',
@@ -28,6 +32,22 @@ export interface JoinRoomPayload {
 export interface LeaveRoomPayload {
   roomId?: string;
   roomCode?: string;
+}
+
+export interface PlayPayload {
+  currentTime?: number;
+}
+
+export interface PausePayload {
+  currentTime?: number;
+}
+
+export interface SeekPayload {
+  time: number;
+}
+
+export interface ChangeVideoPayload {
+  videoId: string;
 }
 
 // Runtime Memory Representation of a Connected Participant
@@ -81,6 +101,26 @@ export interface UserLeftPayload {
 export interface ParticipantUpdatePayload {
   participants: SafeParticipantDto[];
   participantCount: number;
+}
+
+export interface PlaybackBroadcastPayload {
+  currentTime: number;
+  serverTimestamp: number;
+  triggeredBy: string;
+}
+
+export interface SeekBroadcastPayload {
+  currentTime: number;
+  serverTimestamp: number;
+  triggeredBy: string;
+}
+
+export interface ChangeVideoBroadcastPayload {
+  videoId: string;
+  playState: PlaybackState;
+  currentTime: number;
+  serverTimestamp: number;
+  triggeredBy: string;
 }
 
 export interface SocketErrorPayload {

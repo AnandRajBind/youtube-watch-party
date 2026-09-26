@@ -172,6 +172,9 @@ export async function checkRole(roomCode: string, userId: string): Promise<Role>
  */
 export async function broadcastRoomState(io: SocketIOServer, roomCode: string): Promise<void> {
   const code = roomCode.trim().toUpperCase();
+  const roomExists = await RoomModel.exists({ roomCode: code });
+  if (!roomExists) return;
+
   const room = await getRoom(code);
 
   io.to(code).emit(SOCKET_EVENTS.SYNC_STATE, {
@@ -197,6 +200,9 @@ export async function broadcastRoomState(io: SocketIOServer, roomCode: string): 
  */
 export async function broadcastParticipants(io: SocketIOServer, roomCode: string): Promise<void> {
   const code = roomCode.trim().toUpperCase();
+  const roomExists = await RoomModel.exists({ roomCode: code });
+  if (!roomExists) return;
+
   const room = await getRoom(code);
 
   // Combine MongoDB participant data with runtime in-memory presence
