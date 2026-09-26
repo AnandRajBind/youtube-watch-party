@@ -333,46 +333,82 @@ async function runRbacTests() {
 
     // ========================================================================
     // 5. PARTICIPANT REMOVAL: remove_participant
-    // Only Host can remove members. Moderator and Participant cannot.
+    // Payload: { userId }
+    // Requirements: Host only, Host cannot remove themselves, target must belong
+    // to room, notify removed user before disconnect, update active state & DB,
+    // broadcast participant_removed + updated participant list, handle race conditions.
     // ========================================================================
-    console.log('[TEST 5] Testing remove_participant RBAC and Broadcasts...');
+    console.log('[TEST 5] Testing remove_participant RBAC, Validations, and Broadcasts...');
 
     // 5a: Moderator tries to remove participant -> Rejected
     const modRemoveErrorPromise = waitForEvent(modSocket, SOCKET_EVENTS.ERROR);
-    modSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { targetUserId: partUserId });
+    modSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { userId: partUserId });
     const modRemoveError: any = await modRemoveErrorPromise;
     assert.strictEqual(modRemoveError.code, 'FORBIDDEN_REMOVE_PARTICIPANT');
     console.log('[PASS] Moderator cannot remove participants (rejected with FORBIDDEN_REMOVE_PARTICIPANT).');
 
     // 5b: Participant tries to remove someone -> Rejected
     const partRemoveErrorPromise = waitForEvent(partSocket, SOCKET_EVENTS.ERROR);
-    partSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { targetUserId: modUserId });
+    partSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { userId: modUserId });
     const partRemoveError: any = await partRemoveErrorPromise;
     assert.strictEqual(partRemoveError.code, 'FORBIDDEN_REMOVE_PARTICIPANT');
     console.log('[PASS] Participant cannot remove participants (rejected with FORBIDDEN_REMOVE_PARTICIPANT).');
 
-    // 5c: Host removes Bob (partUserId)
+    // 5c: Host attempts to remove themselves -> Rejected
+    const selfRemoveErrorPromise = waitForEvent(hostSocket, SOCKET_EVENTS.ERROR);
+    hostSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { userId: hostUserId });
+    const selfRemoveError: any = await selfRemoveErrorPromise;
+    assert.strictEqual(selfRemoveError.code, 'CANNOT_REMOVE_HOST');
+    console.log('[PASS] Host cannot remove themselves (rejected with CANNOT_REMOVE_HOST).');
+
+    // 5d: Target user outside room / unknown user -> Rejected
+    const unknownRemoveErrorPromise = waitForEvent(hostSocket, SOCKET_EVENTS.ERROR);
+    hostSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { userId: 'non-existent-user-uuid' });
+    const unknownRemoveError: any = await unknownRemoveErrorPromise;
+    assert.strictEqual(unknownRemoveError.code, 'USER_NOT_FOUND');
+    console.log('[PASS] Removing unknown user outside room rejected with USER_NOT_FOUND.');
+
+    // 5e: Valid Removal: Host removes Bob (partUserId) using { userId } payload
     const partRemovedOnBobPromise = waitForEvent(partSocket, SOCKET_EVENTS.PARTICIPANT_REMOVED);
+    const bobDisconnectPromise = waitForEvent(partSocket, 'disconnect');
     const partRemovedOnModPromise = waitForEvent(modSocket, SOCKET_EVENTS.PARTICIPANT_REMOVED);
+    const modParticipantUpdatePromise = waitForEvent(modSocket, SOCKET_EVENTS.PARTICIPANT_UPDATE);
 
-    hostSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { targetUserId: partUserId });
+    hostSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { userId: partUserId });
 
-    const [bobRemovedData, modRemovedData]: any = await Promise.all([
+    const [bobRemovedData, , modRemovedData, modPartUpdate]: any = await Promise.all([
       partRemovedOnBobPromise,
+      bobDisconnectPromise,
       partRemovedOnModPromise,
+      modParticipantUpdatePromise,
     ]);
 
-    assert.strictEqual(bobRemovedData.targetUserId, partUserId);
+    // Target received notification before disconnect
+    assert.strictEqual(bobRemovedData.userId, partUserId);
     assert.strictEqual(bobRemovedData.removedBy, 'AliceHost');
-    assert.strictEqual(modRemovedData.targetUserId, partUserId);
-    console.log('[PASS] Host successfully kicked Bob; target socket received notification and left room channel.');
+    assert.ok(bobRemovedData.reason.includes('Host'));
 
-    // 5d: Host attempts to remove self -> Rejected
-    const selfRemoveErrorPromise = waitForEvent(hostSocket, SOCKET_EVENTS.ERROR);
-    hostSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { targetUserId: hostUserId });
-    const selfRemoveError: any = await selfRemoveErrorPromise;
-    assert.strictEqual(selfRemoveError.code, 'BAD_REQUEST');
-    console.log('[PASS] Removing the Host is rejected.');
+    // Remaining member received broadcast
+    assert.strictEqual(modRemovedData.userId, partUserId);
+    assert.strictEqual(modRemovedData.removedBy, 'AliceHost');
+
+    // Updated participant list sent to room without Bob
+    const bobInList = modPartUpdate.participants.find((p: any) => p.userId === partUserId);
+    assert.strictEqual(bobInList, undefined);
+    console.log('[PASS] Host successfully removed Bob via { userId }; Bob notified & disconnected; room received broadcast + updated list.');
+
+    // 5f: Verify persistent storage: Bob is removed from MongoDB
+    const roomAfterRemoval = await RoomModel.findOne({ roomCode });
+    const bobInDb = roomAfterRemoval?.participants.find((p) => p.userId === partUserId);
+    assert.strictEqual(bobInDb, undefined);
+    console.log('[PASS] Persistent storage verified: Participant removed from MongoDB.');
+
+    // 5g: Race condition handling: Concurrent / repeated removal of already removed user is handled safely
+    const duplicateRemoveErrorPromise = waitForEvent(hostSocket, SOCKET_EVENTS.ERROR);
+    hostSocket.emit(SOCKET_EVENTS.REMOVE_PARTICIPANT, { userId: partUserId });
+    const dupRemoveError: any = await duplicateRemoveErrorPromise;
+    assert.strictEqual(dupRemoveError.code, 'USER_NOT_FOUND');
+    console.log('[PASS] Safe race condition handling: duplicate removal handled gracefully without errors.');
 
     // ========================================================================
     // 6. HOST TRANSFER: transfer_host

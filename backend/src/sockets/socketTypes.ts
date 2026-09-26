@@ -64,7 +64,8 @@ export interface AssignRolePayload {
 }
 
 export interface RemoveParticipantPayload {
-  targetUserId: string;
+  userId?: string;
+  targetUserId?: string;
 }
 
 export interface TransferHostPayload {
@@ -153,6 +154,7 @@ export interface RoleAssignedBroadcastPayload {
 }
 
 export interface ParticipantRemovedBroadcastPayload {
+  userId: string;
   targetUserId: string;
   removedBy: string;
   reason?: string;
