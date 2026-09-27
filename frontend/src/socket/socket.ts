@@ -16,12 +16,15 @@ import type {
 import { SOCKET_EVENTS } from '../types/socket.types';
 
 const getSocketUrl = (): string => {
-  const envUrl = import.meta.env.VITE_SOCKET_URL;
-  if (!envUrl) {
-    return 'http://localhost:5000';
+  const envSocketUrl = import.meta.env.VITE_SOCKET_URL;
+  if (envSocketUrl) {
+    return envSocketUrl.replace(/\/+$/, '').replace(/\/api$/, '');
   }
-  // Trim trailing slash and strip /api if user mistakenly added it to socket URL
-  return envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+  const envApiUrl = import.meta.env.VITE_API_URL;
+  if (envApiUrl) {
+    return envApiUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+  }
+  return 'http://localhost:5000';
 };
 
 class SocketService {

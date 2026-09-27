@@ -23,6 +23,7 @@ const envSchema = z.object({
   CLIENT_URL: z
     .string()
     .default('http://localhost:5173')
+    .transform((val) => val.trim().replace(/\/+$/, ''))
     .refine((val) => val.startsWith('http://') || val.startsWith('https://'), {
       message: 'CLIENT_URL must be a valid HTTP or HTTPS URL',
     }),
