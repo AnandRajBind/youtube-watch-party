@@ -1,6 +1,16 @@
+import dns from 'dns';
 import mongoose from 'mongoose';
 import { env } from './env';
 import { logger } from '../utils/logger';
+
+// Ensure reliable SRV DNS resolution on Windows and cloud environments
+if (env.MONGO_URI.startsWith('mongodb+srv://')) {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1', ...dns.getServers()]);
+  } catch {
+    // ignore if environment restricts custom DNS servers
+  }
+}
 
 export async function connectDatabase(): Promise<void> {
   try {
