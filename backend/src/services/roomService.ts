@@ -64,7 +64,7 @@ export class RoomService {
     }
 
     const hostUserId = providedUserId || crypto.randomUUID();
-    let videoId = 'dQw4w9WgXcQ'; // Default YouTube fallback video
+    let videoId = 'wYnY3l5BEgs'; // Default YouTube fallback video
 
     if (initialVideoUrl) {
       const extracted = extractYouTubeVideoId(initialVideoUrl);

@@ -138,7 +138,7 @@ export class ActionRequestService {
   public async approveRequest(
     requestId: string,
     roomCode: string,
-    approverUserId: string,
+    _approverUserId: string,
     approverUsername: string
   ): Promise<ApprovedActionResult> {
     const code = roomCode?.trim().toUpperCase();
@@ -235,7 +235,7 @@ export class ActionRequestService {
   public rejectRequest(
     requestId: string,
     roomCode: string,
-    rejecterUserId: string,
+    _rejecterUserId: string,
     rejecterUsername: string,
     reason?: string
   ): ActionRequestItem {

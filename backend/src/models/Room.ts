@@ -67,7 +67,7 @@ const RoomSchema = new Schema<IRoomDocument>(
       type: String,
       required: [true, 'Current video ID is required'],
       trim: true,
-      default: 'dQw4w9WgXcQ',
+      default: 'wYnY3l5BEgs',
       match: [/^[a-zA-Z0-9_-]{11}$/, 'Invalid YouTube video ID format (must be 11 characters)'],
     },
     playbackState: {

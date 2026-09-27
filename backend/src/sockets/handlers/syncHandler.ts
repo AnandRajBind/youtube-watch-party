@@ -1,6 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { RoomModel } from '../../models/Room';
-import { checkRole, getParticipant, getRoom, getRuntimeParticipant } from '../roomSocket';
+import { checkRole, getParticipant, getRuntimeParticipant } from '../roomSocket';
 import { syncService } from '../../services/syncService';
 import { extractYouTubeVideoId } from '../../utils/youtube';
 import { PlaybackState, Role } from '../../types/room.types';
