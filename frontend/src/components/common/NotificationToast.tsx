@@ -43,13 +43,13 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
   const getContainerStyle = (type: NotificationType) => {
     switch (type) {
       case 'success':
-        return 'bg-slate-900/95 border-emerald-500/70 text-slate-100 shadow-emerald-950/20';
+        return 'bg-slate-900/90 backdrop-blur-xl border-emerald-500/40 text-slate-100 shadow-2xl shadow-emerald-950/30';
       case 'warning':
-        return 'bg-slate-900/95 border-amber-500/70 text-slate-100 shadow-amber-950/20';
+        return 'bg-slate-900/90 backdrop-blur-xl border-amber-500/40 text-slate-100 shadow-2xl shadow-amber-950/30';
       case 'error':
-        return 'bg-slate-900/95 border-rose-500/70 text-slate-100 shadow-rose-950/20';
+        return 'bg-slate-900/90 backdrop-blur-xl border-rose-500/40 text-slate-100 shadow-2xl shadow-rose-950/30';
       default:
-        return 'bg-slate-900/95 border-blue-500/70 text-slate-100 shadow-blue-950/20';
+        return 'bg-slate-900/90 backdrop-blur-xl border-blue-500/40 text-slate-100 shadow-2xl shadow-blue-950/30';
     }
   };
 

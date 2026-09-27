@@ -56,10 +56,10 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-3 sm:p-4 shadow-sm flex flex-col gap-3">
+    <div className="bg-slate-900/70 backdrop-blur-md border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl shadow-black/20 flex flex-col gap-3.5">
       {/* Progress Bar (Scrubber) */}
-      <div className="flex flex-col gap-1 w-full">
-        <div className="relative w-full flex items-center">
+      <div className="flex flex-col gap-1.5 w-full">
+        <div className="relative w-full flex items-center py-1">
           <input
             type="range"
             min={0}
@@ -69,24 +69,24 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             onChange={handleSliderChange}
             disabled={!isHostOrMod}
             aria-label="Video scrubber"
-            className={`w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-red-500 accent-red-600 ${
+            className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/40 accent-red-600 transition-all ${
               !isHostOrMod ? 'cursor-default pointer-events-none opacity-80' : ''
             }`}
             style={{
-              background: `linear-gradient(to right, #dc2626 0%, #dc2626 ${progressPercentage}%, #334155 ${progressPercentage}%, #334155 100%)`,
+              background: `linear-gradient(to right, #dc2626 0%, #dc2626 ${progressPercentage}%, #1e293b ${progressPercentage}%, #1e293b 100%)`,
             }}
           />
         </div>
 
         {/* Timestamps */}
-        <div className="flex items-center justify-between text-[11px] sm:text-xs font-mono text-slate-400">
-          <span>{formatPlaybackTime(currentTime)}</span>
+        <div className="flex items-center justify-between text-xs font-mono text-slate-400 select-none px-0.5">
+          <span className="text-slate-300 font-medium">{formatPlaybackTime(currentTime)}</span>
           <span>{formatPlaybackTime(duration)}</span>
         </div>
       </div>
 
       {/* Control Buttons & Role Indicator */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-700/60">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
         <div className="flex items-center gap-2">
           {/* Play / Pause Toggle */}
           <button
@@ -95,13 +95,13 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             disabled={!isHostOrMod}
             title={isHostOrMod ? (playbackState === 'playing' ? 'Pause' : 'Play') : 'Viewer mode: synchronized to host'}
             aria-label={playbackState === 'playing' ? 'Pause video' : 'Play video'}
-            className={`p-2.5 rounded-lg flex items-center justify-center text-white transition-colors ${
+            className={`w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all shadow-md focus:outline-none focus-visible:ring-2 active:scale-95 ${
               isHostOrMod
-                ? 'bg-red-600 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/50'
-                : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+                ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-950/30 focus-visible:ring-red-500 cursor-pointer'
+                : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60 border border-slate-700/50'
             }`}
           >
-            {playbackState === 'playing' ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4" />}
+            {playbackState === 'playing' ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4 ml-0.5" />}
           </button>
 
           {/* Quick Skip -10s */}
@@ -109,9 +109,9 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             type="button"
             onClick={() => handleSkip(-10)}
             disabled={!isHostOrMod}
-            title="-10 seconds"
+            title="Rewind 10 seconds"
             aria-label="Rewind 10 seconds"
-            className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center active:scale-95 cursor-pointer"
           >
             <FiRotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -121,18 +121,18 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             type="button"
             onClick={() => handleSkip(10)}
             disabled={!isHostOrMod}
-            title="+10 seconds"
+            title="Fast forward 10 seconds"
             aria-label="Fast forward 10 seconds"
-            className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center active:scale-95 cursor-pointer"
           >
             <FiRotateCw className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Right side: Host status OR Participant "Request control" Button */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           {isHostOrMod ? (
-            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               <span>Direct Control</span>
             </span>
@@ -140,10 +140,10 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             <button
               type="button"
               onClick={onRequestControl}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs focus:outline-none focus:ring-2 ${
+              className={`h-9 px-3.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-md active:scale-95 focus:outline-none focus-visible:ring-2 cursor-pointer ${
                 hasPendingRequest
-                  ? 'bg-amber-600/25 hover:bg-amber-600/35 text-amber-300 border border-amber-500/40 focus:ring-amber-500/50'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white focus:ring-blue-500/50'
+                  ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 focus-visible:ring-amber-500'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-950/30 focus-visible:ring-blue-500'
               }`}
               title={
                 hasPendingRequest
@@ -159,16 +159,16 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
               ) : (
                 <>
                   <FiSend className="w-3 h-3" />
-                  <span>Request control</span>
+                  <span>Request Control</span>
                 </>
               )}
             </button>
           )}
 
-          <span className="hidden sm:inline-block text-slate-600">•</span>
+          <span className="hidden sm:inline-block text-slate-700">•</span>
 
-          <span className="text-[11px] font-mono text-slate-400 uppercase bg-slate-900 px-2 py-0.5 rounded border border-slate-700/60 flex items-center gap-1">
-            <FiRadio className="w-3 h-3 text-red-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono text-slate-300 uppercase tracking-wider bg-slate-950/70 border border-slate-800">
+            <FiRadio className={`w-3 h-3 ${playbackState === 'playing' ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
             <span>{playbackState}</span>
           </span>
         </div>

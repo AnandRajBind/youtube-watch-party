@@ -54,38 +54,38 @@ export const VideoUrlInput: React.FC<VideoUrlInputProps> = ({
   };
 
   return (
-    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-3 sm:p-4 shadow-sm flex flex-col gap-2">
+    <div className="bg-slate-900/70 backdrop-blur-md border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl shadow-black/20 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <label htmlFor="video-url-input" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+        <label htmlFor="video-url-input" className="text-xs font-semibold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
           <FiYoutube className="w-4 h-4 text-red-500" />
-          <span>{isHostOrMod ? 'Change Video' : 'Request Video Change'}</span>
+          <span>{isHostOrMod ? 'Change YouTube Video' : 'Request Video Change'}</span>
         </label>
-        <span className="text-[11px] font-mono text-slate-400">
-          Current ID: <span className="text-slate-200">{currentVideoId}</span>
+        <span className="text-xs font-mono text-slate-400 bg-slate-950/70 border border-slate-800 px-2.5 py-0.5 rounded-lg">
+          ID: <span className="text-white font-medium">{currentVideoId}</span>
         </span>
       </div>
 
       {error && (
-        <div role="alert" className="p-2 rounded-lg bg-red-950/60 border border-red-800/80 text-red-300 text-xs flex items-center gap-2">
-          <FiAlertCircle className="w-3.5 h-3.5 shrink-0 text-red-400" />
+        <div role="alert" className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs flex items-center gap-2.5 shadow-xs">
+          <FiAlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
           <span>{error}</span>
         </div>
       )}
 
       {successNotice && (
-        <div role="status" className="p-2 rounded-lg bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs flex items-center gap-2">
-          <FiCheck className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+        <div role="status" className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-200 text-xs flex items-center gap-2.5 shadow-xs">
+          <FiCheck className="w-4 h-4 shrink-0 text-emerald-400" />
           <span>{successNotice}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5">
         <input
           id="video-url-input"
           type="text"
           placeholder={
             isHostOrMod
-              ? 'Paste YouTube link or ID (e.g. dQw4w9WgXcQ)'
+              ? 'Paste YouTube link or video ID (e.g. wYnY3l5BEgs)'
               : 'Paste YouTube link to request video change'
           }
           value={inputValue}
@@ -93,23 +93,23 @@ export const VideoUrlInput: React.FC<VideoUrlInputProps> = ({
             setInputValue(e.target.value);
             if (error) setError(null);
           }}
-          className="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+          className="flex-1 h-11 px-4 rounded-xl bg-slate-950/70 border border-slate-800 text-sm text-white placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
         />
 
         <button
           type="submit"
           disabled={!inputValue.trim()}
-          className={`px-4 py-2 rounded-lg text-white text-xs sm:text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus:ring-2 flex items-center justify-center gap-1.5 ${
+          className={`h-11 px-5 rounded-xl text-white text-sm font-semibold transition-all whitespace-nowrap focus:outline-none focus-visible:ring-2 flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-md ${
             isHostOrMod
-              ? 'bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed focus:ring-red-500/50'
-              : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed focus:ring-blue-500/50'
+              ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-950/30 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed focus-visible:ring-red-500'
+              : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-950/30 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed focus-visible:ring-blue-500'
           }`}
         >
           {isHostOrMod ? (
             <span>Change Video</span>
           ) : (
             <>
-              <FiSend className="w-3 h-3" />
+              <FiSend className="w-3.5 h-3.5" />
               <span>Request Change</span>
             </>
           )}

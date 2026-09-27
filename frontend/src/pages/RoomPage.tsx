@@ -206,28 +206,33 @@ export const RoomPage: React.FC = () => {
     return (
       <div className="flex-1 flex flex-col gap-6 max-w-7xl w-full mx-auto animate-pulse">
         {/* Header Skeleton */}
-        <div className="h-20 bg-slate-800/60 rounded-xl border border-slate-700/60 flex items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-slate-700" />
-            <div className="w-28 h-5 rounded bg-slate-700" />
+        <div className="h-24 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 flex items-center justify-between px-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-slate-800/80" />
+            <div className="space-y-2">
+              <div className="w-32 h-5 rounded-md bg-slate-800/80" />
+              <div className="w-24 h-3.5 rounded bg-slate-800/50" />
+            </div>
           </div>
-          <div className="flex gap-2">
-            <div className="w-20 h-8 rounded-lg bg-slate-700" />
-            <div className="w-24 h-8 rounded-lg bg-slate-700" />
+          <div className="flex gap-2.5">
+            <div className="w-28 h-9 rounded-xl bg-slate-800/80" />
+            <div className="w-28 h-9 rounded-xl bg-slate-800/80" />
           </div>
         </div>
 
         {/* Main Content Skeleton */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 flex flex-col gap-4">
-            <div className="aspect-video bg-slate-800/60 rounded-xl border border-slate-700/60 flex flex-col items-center justify-center gap-3">
-              <FiLoader className="w-8 h-8 text-red-500 animate-spin" />
-              <span className="text-xs text-slate-400">Loading watch party room...</span>
+            <div className="aspect-video bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center gap-3 shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <FiLoader className="w-6 h-6 text-red-500 animate-spin" />
+              </div>
+              <span className="text-xs font-medium text-slate-400">Loading watch party session...</span>
             </div>
-            <div className="h-16 bg-slate-800/60 rounded-xl border border-slate-700/60" />
-            <div className="h-12 bg-slate-800/60 rounded-xl border border-slate-700/60" />
+            <div className="h-20 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80" />
+            <div className="h-16 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80" />
           </div>
-          <div className="hidden lg:block lg:col-span-1 h-96 bg-slate-800/60 rounded-xl border border-slate-700/60" />
+          <div className="hidden lg:block lg:col-span-1 h-[420px] bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 shadow-sm" />
         </div>
       </div>
     );
@@ -244,29 +249,29 @@ export const RoomPage: React.FC = () => {
 
     if (isNotFound) {
       return (
-        <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
-          <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-lg">
-            <div className="w-14 h-14 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto mb-4">
+        <div className="flex-1 flex items-center justify-center py-16 sm:py-24 px-4">
+          <div className="max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800/90 rounded-2xl p-6 sm:p-8 text-center shadow-2xl">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-4">
               <FiSearch className="w-7 h-7" />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Room Not Found</h2>
-            <p className="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed">
-              We couldn't find a watch party room with code <span className="font-mono text-white font-semibold">{roomCode}</span>. It may have expired or the link is incorrect.
+            <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Room Not Found</h2>
+            <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+              We couldn't locate a watch party room with code <span className="font-mono text-white font-semibold px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">{roomCode}</span>. It may have expired or the invite link might be incorrect.
             </p>
-            <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 to="/"
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-medium transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm font-semibold transition-all duration-150 shadow-md shadow-red-950/40 hover:shadow-red-900/50"
               >
                 <FiPlus className="w-4 h-4" />
                 <span>Create Watch Party</span>
               </Link>
               <Link
                 to="/"
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs sm:text-sm font-medium transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 text-xs sm:text-sm font-medium transition-all duration-150"
               >
                 <FiArrowLeft className="w-4 h-4" />
-                <span>Return to Home</span>
+                <span>Back to Home</span>
               </Link>
             </div>
           </div>
@@ -276,30 +281,30 @@ export const RoomPage: React.FC = () => {
 
     // General API / Network Connection Error View
     return (
-      <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
-        <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-lg">
-          <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto mb-4">
+      <div className="flex-1 flex items-center justify-center py-16 sm:py-24 px-4">
+        <div className="max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800/90 rounded-2xl p-6 sm:p-8 text-center shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4">
             <FiAlertTriangle className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Connection Error</h2>
-          <p className="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed">
-            {error || 'Unable to connect to the watch party server. Please check your connection and try again.'}
+          <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Connection Issue</h2>
+          <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+            {error || 'Unable to connect to the watch party server. Please check your network and try again.'}
           </p>
-          <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               type="button"
               onClick={() => setRetryTrigger((prev) => prev + 1)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm font-semibold transition-all duration-150 shadow-md shadow-red-950/40 cursor-pointer"
             >
               <FiRefreshCw className="w-4 h-4" />
               <span>Try Again</span>
             </button>
             <Link
               to="/"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs sm:text-sm font-medium transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 text-xs sm:text-sm font-medium transition-all duration-150"
             >
               <FiArrowLeft className="w-4 h-4" />
-              <span>Return to Home</span>
+              <span>Back to Home</span>
             </Link>
           </div>
         </div>
@@ -310,13 +315,13 @@ export const RoomPage: React.FC = () => {
   // 3. Participant Removed Screen
   if (removedNotice) {
     return (
-      <div className="flex-1 flex items-center justify-center py-16 sm:py-20 px-4">
-        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-xl p-6 sm:p-8 text-center shadow-xl">
-          <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto mb-4">
+      <div className="flex-1 flex items-center justify-center py-16 sm:py-24 px-4">
+        <div className="max-w-md w-full bg-slate-900/90 backdrop-blur-xl border border-slate-800/90 rounded-2xl p-6 sm:p-8 text-center shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4">
             <FiUserX className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Removed from Watch Party</h2>
-          <p className="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed bg-slate-900/60 p-3.5 rounded-lg border border-slate-700/80">
+          <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Session Ended</h2>
+          <p className="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed bg-slate-950/70 p-4 rounded-xl border border-slate-800/80 font-mono">
             {removedNotice}
           </p>
           <button
@@ -325,7 +330,7 @@ export const RoomPage: React.FC = () => {
               sessionStorage.clear();
               navigate('/');
             }}
-            className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium border border-slate-700/80 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 cursor-pointer"
           >
             Back to Home
           </button>
@@ -338,31 +343,38 @@ export const RoomPage: React.FC = () => {
   if (needsJoin && initialRoom) {
     return (
       <div className="flex-1 flex items-center justify-center py-12 sm:py-20 px-4">
-        <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-xl p-6 sm:p-8 shadow-sm">
+        <div className="max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-2xl">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
               <FiLogIn className="w-4 h-4" />
             </div>
-            <h2 className="text-xl font-semibold text-white">Join Watch Party</h2>
+            <div>
+              <h2 className="text-lg font-bold text-white tracking-tight">Join Watch Party</h2>
+              <p className="text-[11px] text-slate-400">Direct invite confirmation</p>
+            </div>
           </div>
           <p className="text-slate-400 text-xs sm:text-sm mb-5 leading-relaxed">
-            You were invited to room <span className="font-mono text-white font-medium">{initialRoom.roomCode}</span>. Enter your username to enter the party.
+            You've been invited to watch together in room{' '}
+            <span className="font-mono text-white font-semibold px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700/80">
+              {initialRoom.roomCode}
+            </span>
+            . Enter your display name to join.
           </p>
 
           {directJoinError && (
             <div
               role="alert"
-              className="mb-4 p-3 rounded-lg bg-red-950/60 border border-red-800/80 text-red-200 text-xs flex items-start gap-2.5"
+              className="mb-4 p-3 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-200 text-xs flex items-start gap-2.5 shadow-sm"
             >
-              <FiAlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+              <FiAlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
               <span>{directJoinError}</span>
             </div>
           )}
 
           <form onSubmit={handleDirectJoinSubmit} noValidate aria-label="Join Room Link Form" className="space-y-4">
             <div>
-              <label htmlFor="direct-username" className="block text-xs font-medium text-slate-300 mb-1.5">
-                Your Username <span className="text-red-400" aria-hidden="true">*</span>
+              <label htmlFor="direct-username" className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Display Name <span className="text-red-400" aria-hidden="true">*</span>
               </label>
               <input
                 id="direct-username"
@@ -379,15 +391,16 @@ export const RoomPage: React.FC = () => {
                 }}
                 aria-invalid={!!directUsernameError}
                 aria-describedby={directUsernameError ? 'direct-username-error' : undefined}
-                className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-850 ${
+                className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-white placeholder-slate-500 text-sm focus:outline-none transition-all duration-150 ${
                   directUsernameError
-                    ? 'border-red-500 focus:ring-red-500/50'
-                    : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500/30'
+                    ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/30'
+                    : 'border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
                 }`}
               />
               {directUsernameError && (
-                <p id="direct-username-error" className="mt-1 text-xs text-red-400">
-                  {directUsernameError}
+                <p id="direct-username-error" className="mt-1.5 text-xs text-rose-400 flex items-center gap-1.5">
+                  <FiAlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{directUsernameError}</span>
                 </p>
               )}
             </div>
@@ -397,12 +410,12 @@ export const RoomPage: React.FC = () => {
                 type="submit"
                 disabled={isDirectJoining}
                 aria-busy={isDirectJoining}
-                className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500 shadow-sm"
+                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-md shadow-blue-950/40 cursor-pointer"
               >
                 {isDirectJoining ? (
                   <>
                     <FiLoader className="w-4 h-4 animate-spin" />
-                    <span>Joining Party...</span>
+                    <span>Entering Room...</span>
                   </>
                 ) : (
                   <>
@@ -451,29 +464,31 @@ export const RoomPage: React.FC = () => {
       {isReconnecting && (
         <div
           role="status"
-          className="p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-200 text-xs flex items-center justify-between shadow-xs"
+          className="p-3.5 rounded-xl bg-amber-950/60 border border-amber-800/80 text-amber-200 text-xs flex items-center justify-between shadow-md"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <FiRefreshCw className="w-4 h-4 shrink-0 text-amber-400 animate-spin" />
-            <span>Reconnecting to Watch Party server...</span>
+            <span className="font-medium">Reconnecting to Watch Party server...</span>
           </div>
-          <span className="text-[11px] text-amber-400/90 font-mono">Auto-syncing</span>
+          <span className="text-[11px] text-amber-400 font-mono px-2 py-0.5 rounded-md bg-amber-900/50 border border-amber-700/60">
+            Auto-syncing
+          </span>
         </div>
       )}
 
       {!socketConnected && !isReconnecting && (
         <div
           role="alert"
-          className="p-3 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-200 text-xs flex items-center justify-between shadow-xs"
+          className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs flex items-center justify-between shadow-md"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <FiWifiOff className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>Disconnected from server. Real-time playback synchronization is paused.</span>
+            <span className="font-medium">Disconnected from server. Real-time playback synchronization is paused.</span>
           </div>
           <button
             type="button"
             onClick={actions.reconnect}
-            className="px-2.5 py-1 rounded-md bg-rose-800 hover:bg-rose-700 text-white font-medium text-xs transition-colors shrink-0 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-rose-800 hover:bg-rose-700 text-white font-semibold text-xs transition-colors shrink-0 shadow-sm cursor-pointer"
           >
             Reconnect Now
           </button>
@@ -528,19 +543,19 @@ export const RoomPage: React.FC = () => {
           />
 
           {/* D. Mobile Participants Trigger Banner */}
-          <div className="lg:hidden bg-slate-800/80 border border-slate-700 rounded-xl p-3.5 flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-slate-700/60 flex items-center justify-center shrink-0">
+          <div className="lg:hidden bg-slate-900/80 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 flex items-center justify-between shadow-md">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center shrink-0">
                 <FiUsers className="w-4 h-4 text-blue-400" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-semibold text-white">Participants</h3>
-                  <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                  <h3 className="text-xs font-bold text-white tracking-tight">Participants</h3>
+                  <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
                     {activeRoom.participants.length}
                   </span>
                 </div>
-                <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                <p className="text-[11px] text-emerald-400 flex items-center gap-1.5 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span>{activeRoom.participants.filter((p) => p.isOnline).length} online</span>
                 </p>
@@ -550,7 +565,7 @@ export const RoomPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsMobileParticipantsOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all duration-150 shrink-0 shadow-sm shadow-blue-950/40 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               View Panel
             </button>

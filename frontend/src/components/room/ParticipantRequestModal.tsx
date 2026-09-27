@@ -77,52 +77,52 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
       role="dialog"
       aria-modal="true"
       aria-labelledby="request-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-5 sm:p-6 shadow-xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="flex items-start justify-between pb-3.5 border-b border-slate-800">
           <div>
-            <h2 id="request-modal-title" className="text-base font-semibold text-white">
+            <h2 id="request-modal-title" className="text-base sm:text-lg font-bold text-white tracking-tight">
               Request Playback Action
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Submit a proposal for the Host or Moderator to review.
+            <p className="text-xs text-slate-400 mt-1">
+              Submit a proposal for the room Host or Moderator to review.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
-            <FiX className="w-5 h-5" />
+            <FiX className="w-4 h-4" />
           </button>
         </div>
 
         {formError && (
-          <div role="alert" className="p-2.5 rounded-lg bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-center gap-2">
-            <FiAlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+          <div role="alert" className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-200 text-xs flex items-center gap-2.5">
+            <FiAlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span>{formError}</span>
           </div>
         )}
 
         {/* Action Type Selector */}
-        <div className="grid grid-cols-2 gap-2 text-xs font-medium">
+        <div className="grid grid-cols-2 gap-2.5 text-xs font-semibold">
           <button
             type="button"
             onClick={() => {
               setSelectedAction('play');
               setFormError(null);
             }}
-            className={`p-2.5 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
+            className={`h-11 rounded-xl border flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
               selectedAction === 'play'
-                ? 'bg-red-600/20 border-red-500 text-red-300'
-                : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+                ? 'bg-red-500/15 border-red-500/80 text-red-300 shadow-xs shadow-red-950/20'
+                : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
             }`}
           >
             <FiPlay className="w-3.5 h-3.5" />
@@ -135,10 +135,10 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
               setSelectedAction('pause');
               setFormError(null);
             }}
-            className={`p-2.5 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
+            className={`h-11 rounded-xl border flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
               selectedAction === 'pause'
-                ? 'bg-red-600/20 border-red-500 text-red-300'
-                : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+                ? 'bg-red-500/15 border-red-500/80 text-red-300 shadow-xs shadow-red-950/20'
+                : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
             }`}
           >
             <FiPause className="w-3.5 h-3.5" />
@@ -151,10 +151,10 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
               setSelectedAction('seek');
               setFormError(null);
             }}
-            className={`p-2.5 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
+            className={`h-11 rounded-xl border flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
               selectedAction === 'seek'
-                ? 'bg-blue-600/20 border-blue-500 text-blue-300'
-                : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+                ? 'bg-blue-500/15 border-blue-500/80 text-blue-300 shadow-xs shadow-blue-950/20'
+                : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
             }`}
           >
             <FiFastForward className="w-3.5 h-3.5" />
@@ -167,10 +167,10 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
               setSelectedAction('change_video');
               setFormError(null);
             }}
-            className={`p-2.5 rounded-lg border flex items-center justify-center gap-2 transition-colors ${
+            className={`h-11 rounded-xl border flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
               selectedAction === 'change_video'
-                ? 'bg-blue-600/20 border-blue-500 text-blue-300'
-                : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+                ? 'bg-blue-500/15 border-blue-500/80 text-blue-300 shadow-xs shadow-blue-950/20'
+                : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
             }`}
           >
             <FiYoutube className="w-3.5 h-3.5" />
@@ -181,9 +181,9 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
         {/* Dynamic Fields for Seek or Change Video */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-1">
           {selectedAction === 'seek' && (
-            <div>
-              <label htmlFor="seek-time-input" className="block text-xs font-medium text-slate-300 mb-1">
-                Target Timestamp: <span className="font-mono text-white">{formatPlaybackTime(seekSeconds)}</span>
+            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5">
+              <label htmlFor="seek-time-input" className="block text-xs font-semibold text-slate-300 mb-2">
+                Target Timestamp: <span className="font-mono text-white text-sm ml-1">{formatPlaybackTime(seekSeconds)}</span>
               </label>
               <input
                 id="seek-time-input"
@@ -192,9 +192,9 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
                 max={duration || 600}
                 value={seekSeconds}
                 onChange={(e) => setSeekSeconds(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-slate-700 rounded-lg accent-blue-500 cursor-pointer"
+                className="w-full h-1.5 bg-slate-800 rounded-lg accent-blue-500 cursor-pointer"
               />
-              <div className="flex justify-between text-[11px] font-mono text-slate-400 mt-1">
+              <div className="flex justify-between text-[11px] font-mono text-slate-400 mt-1.5">
                 <span>00:00</span>
                 <span>{formatPlaybackTime(duration)}</span>
               </div>
@@ -203,7 +203,7 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
 
           {selectedAction === 'change_video' && (
             <div>
-              <label htmlFor="change-video-input" className="block text-xs font-medium text-slate-300 mb-1">
+              <label htmlFor="change-video-input" className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
                 YouTube URL or Video ID
               </label>
               <input
@@ -212,30 +212,30 @@ export const ParticipantRequestModal: React.FC<ParticipantRequestModalProps> = (
                 placeholder="https://www.youtube.com/watch?v=..."
                 value={videoInput}
                 onChange={(e) => setVideoInput(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full h-11 px-4 rounded-xl bg-slate-950/70 border border-slate-800 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
               />
             </div>
           )}
 
           {(selectedAction === 'play' || selectedAction === 'pause') && (
-            <p className="text-xs text-slate-400 bg-slate-800/40 p-2.5 rounded-lg border border-slate-800">
-              Requesting to <span className="text-white font-medium capitalize">{selectedAction}</span> the video at the current position{' '}
-              <span className="font-mono text-white">({formatPlaybackTime(currentTime)})</span>.
+            <p className="text-xs text-slate-300 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 leading-relaxed">
+              Requesting to <span className="text-white font-semibold capitalize">{selectedAction}</span> playback at current timestamp{' '}
+              <span className="font-mono text-white font-semibold">({formatPlaybackTime(currentTime)})</span>.
             </p>
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="h-10 px-4 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
+              className="h-10 px-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold transition-all flex items-center gap-2 shadow-md shadow-blue-950/30 active:scale-95 cursor-pointer"
             >
               <FiSend className="w-3.5 h-3.5" />
               <span>Send Request</span>

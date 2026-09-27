@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FiPlus, FiLogIn, FiAlertCircle, FiLoader } from 'react-icons/fi';
+import {
+  FiPlus,
+  FiLogIn,
+  FiAlertCircle,
+  FiLoader,
+  FiShield,
+  FiZap,
+  FiGlobe,
+} from 'react-icons/fi';
 import { roomApiService, AppApiError } from '../services/api';
 import { parseRoomCode, isValidRoomCode, validateUsername } from '../utils/roomCode';
 
@@ -133,50 +141,59 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-center items-center py-4 sm:py-8 w-full">
-      <div className="w-full max-w-4xl mx-auto">
+    <div className="flex-1 flex flex-col justify-center items-center py-6 sm:py-10 md:py-12 w-full animate-in fade-in duration-300">
+      <div className="w-full max-w-4xl mx-auto flex flex-col gap-8 sm:gap-12">
         {/* Header Hero Section */}
-        <div className="text-center mb-8 sm:mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-medium mb-3 border border-slate-700">
+        <div className="text-center flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 text-slate-300 text-xs font-medium mb-4 border border-slate-700/60 shadow-sm backdrop-blur-xs">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            Server-Authoritative Watch Party
+            <span className="tracking-wide">Server-Authoritative Synchronization</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-3">
-            Watch YouTube Together
+
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white mb-4 leading-tight">
+            Watch YouTube Together,{' '}
+            <span className="bg-gradient-to-r from-red-400 via-rose-400 to-amber-300 bg-clip-text text-transparent">
+              Anywhere.
+            </span>
           </h1>
-          <p className="text-slate-400 text-xs sm:text-base max-w-xl mx-auto leading-relaxed">
-            Real-time synchronized video playback with authoritative controls, role permissions, and instant request approvals.
+
+          <p className="text-slate-400 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Real-time synchronized video playback with authoritative playback controls, role permissions, and instant request approvals.
           </p>
         </div>
 
         {/* Action Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-          {/* Form 1: Create Watch Party */}
-          <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 sm:p-7 flex flex-col justify-between shadow-sm">
+          {/* Card 1: Create Watch Party */}
+          <div className="bg-slate-900/70 backdrop-blur-md border border-slate-800 hover:border-slate-700/80 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-black/20 transition-all duration-200">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center font-bold">
-                  <FiPlus className="w-4 h-4" />
+              <div className="flex items-center gap-3.5 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/20 to-rose-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold shadow-xs">
+                  <FiPlus className="w-5 h-5" />
                 </div>
-                <h2 className="text-lg sm:text-xl font-semibold text-white">Create Watch Party</h2>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Create Watch Party</h2>
+                  <span className="text-[11px] text-red-400 font-medium uppercase tracking-wider">Host Access</span>
+                </div>
               </div>
-              <p className="text-slate-400 text-xs sm:text-sm mb-5 leading-normal">
-                Start a new watch party as the room Host with administrative and playback permissions.
+
+              <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+                Create a new private room as the Host with full administrative playback controls and participant management.
               </p>
 
               {createFormError && (
                 <div
                   role="alert"
-                  className="mb-4 p-3 rounded-lg bg-red-950/60 border border-red-800/80 text-red-200 text-xs flex items-start gap-2.5"
+                  className="mb-5 p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs flex items-start gap-2.5 shadow-xs"
                 >
-                  <FiAlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
-                  <span>{createFormError}</span>
+                  <FiAlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                  <span className="leading-relaxed">{createFormError}</span>
                 </div>
               )}
 
               <form onSubmit={handleCreateSubmit} noValidate aria-label="Create Watch Party Form" className="space-y-4">
                 <div>
-                  <label htmlFor="create-username" className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="create-username" className="block text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">
                     Your Username <span className="text-red-400" aria-hidden="true">*</span>
                   </label>
                   <input
@@ -194,15 +211,16 @@ export const HomePage: React.FC = () => {
                     }}
                     aria-invalid={!!createUsernameError}
                     aria-describedby={createUsernameError ? 'create-username-error' : undefined}
-                    className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-850 ${
+                    className={`w-full h-11 px-4 rounded-xl bg-slate-950/70 border text-white placeholder-slate-500 text-sm transition-all focus:outline-none focus:ring-2 ${
                       createUsernameError
-                        ? 'border-red-500 focus:ring-red-500/50'
-                        : 'border-slate-700 focus:border-red-500 focus:ring-red-500/30'
+                        ? 'border-rose-500 focus:ring-rose-500/40'
+                        : 'border-slate-800 focus:border-red-500 focus:ring-red-500/30'
                     }`}
                   />
                   {createUsernameError && (
-                    <p id="create-username-error" className="mt-1 text-xs text-red-400">
-                      {createUsernameError}
+                    <p id="create-username-error" className="mt-1.5 text-xs text-rose-400 flex items-center gap-1 font-medium">
+                      <FiAlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{createUsernameError}</span>
                     </p>
                   )}
                 </div>
@@ -212,16 +230,16 @@ export const HomePage: React.FC = () => {
                     type="submit"
                     disabled={isCreating}
                     aria-busy={isCreating}
-                    className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-red-500 shadow-sm"
+                    className="w-full h-11 px-5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 shadow-md shadow-red-950/30 cursor-pointer"
                   >
                     {isCreating ? (
                       <>
-                        <FiLoader className="w-4 h-4 animate-spin" />
-                        <span>Creating Party...</span>
+                        <FiLoader className="w-4 h-4 animate-spin text-white" />
+                        <span>Creating Room...</span>
                       </>
                     ) : (
                       <>
-                        <FiPlus className="w-4 h-4" />
+                        <FiPlus className="w-4 h-4 text-white" />
                         <span>Create Watch Party</span>
                       </>
                     )}
@@ -231,32 +249,36 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Form 2: Join Watch Party */}
-          <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 sm:p-7 flex flex-col justify-between shadow-sm">
+          {/* Card 2: Join Watch Party */}
+          <div className="bg-slate-900/70 backdrop-blur-md border border-slate-800 hover:border-slate-700/80 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-black/20 transition-all duration-200">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
-                  <FiLogIn className="w-4 h-4" />
+              <div className="flex items-center gap-3.5 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold shadow-xs">
+                  <FiLogIn className="w-5 h-5" />
                 </div>
-                <h2 className="text-lg sm:text-xl font-semibold text-white">Join Watch Party</h2>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Join Watch Party</h2>
+                  <span className="text-[11px] text-blue-400 font-medium uppercase tracking-wider">Participant Access</span>
+                </div>
               </div>
-              <p className="text-slate-400 text-xs sm:text-sm mb-5 leading-normal">
-                Enter an existing room code or paste a shared party link to join your friends.
+
+              <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+                Enter an existing 6-character room code or paste a shared party invite link to connect with friends.
               </p>
 
               {joinFormError && (
                 <div
                   role="alert"
-                  className="mb-4 p-3 rounded-lg bg-red-950/60 border border-red-800/80 text-red-200 text-xs flex items-start gap-2.5"
+                  className="mb-5 p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs flex items-start gap-2.5 shadow-xs"
                 >
-                  <FiAlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
-                  <span>{joinFormError}</span>
+                  <FiAlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                  <span className="leading-relaxed">{joinFormError}</span>
                 </div>
               )}
 
               <form onSubmit={handleJoinSubmit} noValidate aria-label="Join Watch Party Form" className="space-y-4">
                 <div>
-                  <label htmlFor="join-room-code" className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="join-room-code" className="block text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">
                     Room Code or Link <span className="text-red-400" aria-hidden="true">*</span>
                   </label>
                   <input
@@ -270,21 +292,22 @@ export const HomePage: React.FC = () => {
                     onBlur={handleRoomInputBlur}
                     aria-invalid={!!joinRoomError}
                     aria-describedby={joinRoomError ? 'join-room-error' : undefined}
-                    className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border text-white placeholder-slate-500 text-sm font-mono tracking-wide uppercase focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-850 ${
+                    className={`w-full h-11 px-4 rounded-xl bg-slate-950/70 border text-white placeholder-slate-500 text-sm font-mono tracking-wider uppercase transition-all focus:outline-none focus:ring-2 ${
                       joinRoomError
-                        ? 'border-red-500 focus:ring-red-500/50'
-                        : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500/30'
+                        ? 'border-rose-500 focus:ring-rose-500/40'
+                        : 'border-slate-800 focus:border-blue-500 focus:ring-blue-500/30'
                     }`}
                   />
                   {joinRoomError && (
-                    <p id="join-room-error" className="mt-1 text-xs text-red-400">
-                      {joinRoomError}
+                    <p id="join-room-error" className="mt-1.5 text-xs text-rose-400 flex items-center gap-1 font-medium">
+                      <FiAlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{joinRoomError}</span>
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="join-username" className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="join-username" className="block text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">
                     Your Username <span className="text-red-400" aria-hidden="true">*</span>
                   </label>
                   <input
@@ -302,15 +325,16 @@ export const HomePage: React.FC = () => {
                     }}
                     aria-invalid={!!joinUsernameError}
                     aria-describedby={joinUsernameError ? 'join-username-error' : undefined}
-                    className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-850 ${
+                    className={`w-full h-11 px-4 rounded-xl bg-slate-950/70 border text-white placeholder-slate-500 text-sm transition-all focus:outline-none focus:ring-2 ${
                       joinUsernameError
-                        ? 'border-red-500 focus:ring-red-500/50'
-                        : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500/30'
+                        ? 'border-rose-500 focus:ring-rose-500/40'
+                        : 'border-slate-800 focus:border-blue-500 focus:ring-blue-500/30'
                     }`}
                   />
                   {joinUsernameError && (
-                    <p id="join-username-error" className="mt-1 text-xs text-red-400">
-                      {joinUsernameError}
+                    <p id="join-username-error" className="mt-1.5 text-xs text-rose-400 flex items-center gap-1 font-medium">
+                      <FiAlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{joinUsernameError}</span>
                     </p>
                   )}
                 </div>
@@ -320,22 +344,55 @@ export const HomePage: React.FC = () => {
                     type="submit"
                     disabled={isJoining}
                     aria-busy={isJoining}
-                    className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500 shadow-sm"
+                    className="w-full h-11 px-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 shadow-md shadow-blue-950/30 cursor-pointer"
                   >
                     {isJoining ? (
                       <>
-                        <FiLoader className="w-4 h-4 animate-spin" />
-                        <span>Joining Party...</span>
+                        <FiLoader className="w-4 h-4 animate-spin text-white" />
+                        <span>Joining Room...</span>
                       </>
                     ) : (
                       <>
-                        <FiLogIn className="w-4 h-4" />
+                        <FiLogIn className="w-4 h-4 text-white" />
                         <span>Join Watch Party</span>
                       </>
                     )}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+
+        {/* Professional Feature Pills */}
+        <div className="pt-4 border-t border-slate-800/60 grid grid-cols-1 sm:grid-cols-3 gap-4 text-slate-400 text-xs">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-slate-800/40">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+              <FiZap className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-200">Sub-Second Sync</p>
+              <p className="text-[11px] text-slate-400">Zero playback drift or echo loops</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-slate-800/40">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+              <FiShield className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-200">Role-Based Access</p>
+              <p className="text-[11px] text-slate-400">Host, Moderator & Requests</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-slate-800/40">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+              <FiGlobe className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-200">Instant Sharing</p>
+              <p className="text-[11px] text-slate-400">No browser extension needed</p>
             </div>
           </div>
         </div>

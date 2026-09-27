@@ -391,7 +391,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     );
 
     return (
-      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden relative shadow-lg border border-slate-800 select-none">
+      <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden relative shadow-2xl border border-slate-800/80 select-none">
         {/* Target div for YouTube IFrame insertion */}
         <div id={containerId} className="w-full h-full" />
 

@@ -67,21 +67,21 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
     switch (currentRole) {
       case 'host':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
             <FiAward className="w-3.5 h-3.5 text-amber-400" />
             <span>Host</span>
           </span>
         );
       case 'moderator':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-500/30">
             <FiShield className="w-3.5 h-3.5 text-blue-400" />
             <span>Moderator</span>
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700/60">
             <FiUser className="w-3.5 h-3.5 text-slate-400" />
             <span>Participant</span>
           </span>
@@ -90,38 +90,36 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   };
 
   return (
-    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-col gap-3">
+    <div className="bg-slate-900/70 backdrop-blur-md border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl shadow-black/20 flex flex-col gap-3.5">
       {/* Top row: Navigation, Room Code & Share Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: Back button & Room Code */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-3">
           <Link
             to="/"
-            className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-300 hover:text-white transition-all flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 active:scale-95"
             title="Leave Watch Party"
             aria-label="Leave Watch Party"
           >
             <FiArrowLeft className="w-4 h-4" />
           </Link>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">Room</span>
-              <span className="text-base sm:text-lg font-bold font-mono text-white tracking-wider">
-                {roomCode}
-              </span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Room</span>
+            <span className="font-mono text-base sm:text-lg font-bold text-white tracking-widest bg-slate-950/70 border border-slate-800 px-3 py-1 rounded-xl shadow-inner">
+              {roomCode}
+            </span>
           </div>
         </div>
 
         {/* Right Actions: Copy Code, Copy Link, and Mobile Participants Button */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           {/* Mobile Participants Drawer Trigger */}
           {onOpenParticipants && (
             <button
               type="button"
               onClick={onOpenParticipants}
-              className="lg:hidden px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-medium transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="lg:hidden h-9 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/60 text-xs font-medium transition-all flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer active:scale-95"
               title="View Participants"
               aria-label="View Participants"
             >
@@ -134,32 +132,32 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           <button
             type="button"
             onClick={handleCopyCode}
-            className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 focus:outline-none focus:ring-1 ${
+            className={`h-9 px-3 rounded-xl border text-xs font-medium transition-all flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 cursor-pointer active:scale-95 ${
               copiedCode
-                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 focus:ring-emerald-500'
-                : 'bg-slate-700/70 hover:bg-slate-700 border-slate-600/50 text-slate-200 focus:ring-slate-500'
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 focus-visible:ring-emerald-500'
+                : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/60 text-slate-200 hover:text-white focus-visible:ring-slate-500'
             }`}
             title="Copy Room Code"
             aria-label={copiedCode ? 'Room code copied to clipboard' : 'Copy Room Code'}
           >
-            {copiedCode ? <FiCheck className="w-3.5 h-3.5 text-emerald-400" /> : <FiCopy className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{copiedCode ? 'Code Copied!' : 'Copy Code'}</span>
+            {copiedCode ? <FiCheck className="w-3.5 h-3.5 text-emerald-400" /> : <FiCopy className="w-3.5 h-3.5 text-slate-400" />}
+            <span className="hidden sm:inline">{copiedCode ? 'Code Copied' : 'Copy Code'}</span>
           </button>
 
           {/* Copy Room Link */}
           <button
             type="button"
             onClick={handleCopyLink}
-            className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 focus:outline-none focus:ring-1 shadow-xs ${
+            className={`h-9 px-3.5 rounded-xl border text-xs font-semibold transition-all flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 cursor-pointer active:scale-95 ${
               copiedLink
-                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 focus:ring-emerald-500'
-                : 'bg-blue-600 hover:bg-blue-500 border-blue-500 text-white focus:ring-blue-400'
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 focus-visible:ring-emerald-500'
+                : 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 border-red-500/80 text-white shadow-md shadow-red-950/30 focus-visible:ring-red-500'
             }`}
             title="Copy Room Invite Link"
             aria-label={copiedLink ? 'Room link copied to clipboard' : 'Copy Room Link'}
           >
-            {copiedLink ? <FiCheck className="w-3.5 h-3.5 text-emerald-400" /> : <FiShare2 className="w-3.5 h-3.5" />}
-            <span>{copiedLink ? 'Link Copied!' : 'Copy Link'}</span>
+            {copiedLink ? <FiCheck className="w-3.5 h-3.5 text-emerald-400" /> : <FiShare2 className="w-3.5 h-3.5 text-white" />}
+            <span>{copiedLink ? 'Link Copied' : 'Copy Link'}</span>
           </button>
 
           {/* Screen reader live announcement */}
@@ -170,14 +168,11 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
       </div>
 
       {/* Bottom Sub-row: User Info, Role Badge, and Real-Time Sync State */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-slate-700/60 text-xs">
-        <div className="flex items-center gap-3">
-          {/* Current User and Role */}
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">You:</span>
-            <span className="font-semibold text-white truncate max-w-[140px] sm:max-w-[200px]">{currentUser}</span>
-            {renderRoleBadge()}
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800 text-xs">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <span className="text-slate-400">You:</span>
+          <span className="font-semibold text-white truncate max-w-[140px] sm:max-w-[200px]">{currentUser}</span>
+          {renderRoleBadge()}
         </div>
 
         {/* Sync Status & Participant Count */}
@@ -186,7 +181,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
             <button
               type="button"
               onClick={onOpenParticipants}
-              className="lg:hidden text-slate-300 hover:text-white font-mono flex items-center gap-1.5 transition-colors focus:outline-none focus:underline"
+              className="lg:hidden text-slate-300 hover:text-white font-mono flex items-center gap-1.5 transition-colors focus:outline-none focus:underline cursor-pointer"
               title="Open participants panel"
             >
               <FiUsers className="w-3.5 h-3.5 text-blue-400" />
@@ -202,29 +197,29 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
             {participantCount} {participantCount === 1 ? 'member' : 'members'}
           </span>
 
-          <span className="text-slate-600">•</span>
+          <span className="text-slate-700">•</span>
 
           {socketConnected ? (
-            <span className="inline-flex items-center gap-1.5 font-medium text-emerald-400">
-              <FiRadio className="w-3.5 h-3.5 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border border-emerald-500/25 bg-emerald-500/10 text-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="hidden sm:inline">Sync Active</span>
             </span>
           ) : isReconnecting ? (
-            <span className="inline-flex items-center gap-1.5 font-medium text-amber-400">
-              <FiRefreshCw className="w-3.5 h-3.5 animate-spin" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border border-amber-500/25 bg-amber-500/10 text-amber-300">
+              <FiRefreshCw className="w-3 h-3 animate-spin text-amber-400" />
               <span className="hidden sm:inline">Reconnecting...</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 font-medium text-rose-400">
-              <FiRadio className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border border-rose-500/25 bg-rose-500/10 text-rose-300">
+              <FiRadio className="w-3 h-3 text-rose-400" />
               <span className="hidden sm:inline">Disconnected</span>
               {onReconnect && (
                 <button
                   type="button"
                   onClick={onReconnect}
-                  className="underline hover:text-rose-300 ml-0.5 text-xs font-semibold focus:outline-none"
+                  className="underline hover:text-rose-200 ml-0.5 font-semibold cursor-pointer"
                 >
-                  (Retry)
+                  Retry
                 </button>
               )}
             </span>
