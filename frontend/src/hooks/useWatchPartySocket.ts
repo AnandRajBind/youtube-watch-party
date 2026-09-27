@@ -67,6 +67,9 @@ export function useWatchPartySocket({
   const currentUserIdRef = useRef(userId);
   currentUserIdRef.current = userId;
 
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+
   const addNotification = useCallback(
     (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', title?: string) => {
       const notif: ActionNotification = {
@@ -426,17 +429,19 @@ export function useWatchPartySocket({
 
   const play = useCallback(() => {
     if (!isHostOrModRef.current) return;
+    const targetTime = playerRef.current?.getCurrentTime() ?? currentTimeRef.current;
     setRoom((prev) => (prev ? { ...prev, playbackState: 'playing' } : prev));
-    playerRef.current?.applyRemotePlay(currentTime);
-    socketService.play({ currentTime });
-  }, [currentTime, playerRef]);
+    playerRef.current?.applyRemotePlay(targetTime);
+    socketService.play({ currentTime: targetTime });
+  }, [playerRef]);
 
   const pause = useCallback(() => {
     if (!isHostOrModRef.current) return;
+    const targetTime = playerRef.current?.getCurrentTime() ?? currentTimeRef.current;
     setRoom((prev) => (prev ? { ...prev, playbackState: 'paused' } : prev));
-    playerRef.current?.applyRemotePause(currentTime);
-    socketService.pause({ currentTime });
-  }, [currentTime, playerRef]);
+    playerRef.current?.applyRemotePause(targetTime);
+    socketService.pause({ currentTime: targetTime });
+  }, [playerRef]);
 
   const seek = useCallback(
     (targetTime: number) => {
@@ -500,14 +505,19 @@ export function useWatchPartySocket({
 
   const submitActionRequest = useCallback(
     (action: ActionRequestType, options?: { time?: number; videoId?: string }) => {
+      const targetTime =
+        options?.time !== undefined
+          ? options.time
+          : (playerRef.current?.getCurrentTime() ?? currentTimeRef.current);
+
       socketService.requestAction({
         action,
-        time: options?.time !== undefined ? options.time : currentTime,
-        currentTime,
+        time: targetTime,
+        currentTime: currentTimeRef.current,
         videoId: options?.videoId,
       });
     },
-    [currentTime]
+    [playerRef]
   );
 
   const approveRequest = useCallback((requestId: string) => {

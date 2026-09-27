@@ -106,7 +106,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     currentVideoIdRef.current = videoId;
 
     // Helper: Mark next player state change as remote-initiated
-    const markRemoteAction = (durationMs = 800) => {
+    const markRemoteAction = (durationMs = 2500) => {
       isRemoteUpdateRef.current = true;
       if (remoteUpdateTimerRef.current) {
         window.clearTimeout(remoteUpdateTimerRef.current);
@@ -185,6 +185,25 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
               // server update. If yes, ignore to avoid echoing back to server!
               // -------------------------------------------------------------
               if (isRemoteUpdateRef.current) {
+                // If player is buffering as part of remote command, extend shield
+                if (window.YT && event.data === window.YT.PlayerState.BUFFERING) {
+                  markRemoteAction(3000);
+                  return;
+                }
+                // When remote action reaches terminal state, reset shield after brief grace period
+                if (
+                  window.YT &&
+                  (event.data === window.YT.PlayerState.PLAYING ||
+                    event.data === window.YT.PlayerState.PAUSED ||
+                    event.data === window.YT.PlayerState.ENDED)
+                ) {
+                  if (remoteUpdateTimerRef.current) {
+                    window.clearTimeout(remoteUpdateTimerRef.current);
+                  }
+                  remoteUpdateTimerRef.current = window.setTimeout(() => {
+                    isRemoteUpdateRef.current = false;
+                  }, 400);
+                }
                 return;
               }
 
